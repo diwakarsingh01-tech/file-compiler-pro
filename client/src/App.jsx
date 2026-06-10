@@ -231,7 +231,11 @@ function App() {
               {files.length === 0 ? (
                 <div className="hero" style={{padding: '4rem 0'}}>
                   <div className="select-btn" onClick={() => document.getElementById('fileInput').click()}>Select File</div>
-                  <input id="fileInput" type="file" multiple hidden accept={activeSegment === 'pdf' ? '.pdf' : '.xlsx,.csv'} onChange={onFileChange} />
+                  <input id="fileInput" type="file" multiple hidden accept={
+                    currentTool.includes('to-pdf') || currentTool === 'excel-merge' ? '.xlsx,.csv' :
+                    currentTool.startsWith('pdf-') || currentTool === 'pdf-to-excel' ? '.pdf' :
+                    activeSegment === 'pdf' ? '.pdf' : '.xlsx,.csv'
+                  } onChange={onFileChange} />
                   <p style={{marginTop: '1.5rem', color: '#888'}}>Private & Secure processing</p>
                 </div>
               ) : (

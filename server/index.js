@@ -35,6 +35,7 @@ const getHeaders = (sheet) => {
 // Excel Merge
 app.post('/api/upload', upload.array('files'), (req, res) => {
     try {
+        if (!validateFiles(req, res)) return;
         const compressionLevel = req.body.level || 'recommended';
         let combinedData = [];
         let masterHeaders = null;
@@ -44,7 +45,11 @@ app.post('/api/upload', upload.array('files'), (req, res) => {
             const workbook = xlsx.readFile(file.path);
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
             const headers = getHeaders(sheet);
-            if (!masterHeaders) masterHeaders = headers;
+            if (!masterHeaders) { masterHeaders = headers; }
+            else if (JSON.stringify(headers) !== JSON.stringify(masterHeaders)) {
+                req.files.forEach(f => { try { fs.unlinkSync(f.path); } catch(e) {} });
+                return res.status(400).json({ error: `Header mismatch in file: ${file.originalname}` });
+            }
             const data = xlsx.utils.sheet_to_json(sheet);
             stats.originalRows += data.length;
 
@@ -80,9 +85,18 @@ app.post('/api/upload', upload.array('files'), (req, res) => {
     } catch (e) { res.status(500).json({ error: 'Excel Error' }); }
 });
 
+const validateFiles = (req, res, min = 1) => {
+  if (!req.files || req.files.length === 0) { res.status(400).json({ error: 'No files uploaded.' }); return false; }
+  if (req.files.length < min) { res.status(400).json({ error: `Need at least ${min} file(s).` }); return false; }
+  return true;
+};
+
+const ensureOutputs = () => { if (!fs.existsSync('outputs')) fs.mkdirSync('outputs'); };
+
 // PDF Merge
 app.post('/api/pdf/merge', upload.array('files'), async (req, res) => {
     try {
+        if (!validateFiles(req, res, 2)) return;
         const mergedPdf = await PDFDocument.create();
         for (const file of req.files) {
             const pdf = await PDFDocument.load(fs.readFileSync(file.path));
@@ -92,7 +106,7 @@ app.post('/api/pdf/merge', upload.array('files'), async (req, res) => {
         }
         const fileName = `merged_${Date.now()}.pdf`;
         const filePath = path.join(__dirname, 'outputs', fileName);
-        if (!fs.existsSync('outputs')) fs.mkdirSync('outputs');
+        ensureOutputs();
         fs.writeFileSync(filePath, await mergedPdf.save());
         res.json({ downloadUrl: `/api/download/${fileName}` });
     } catch (e) { res.status(500).json({ error: 'Merge Error' }); }
@@ -101,13 +115,15 @@ app.post('/api/pdf/merge', upload.array('files'), async (req, res) => {
 // PDF Split
 app.post('/api/pdf/split', upload.array('files'), async (req, res) => {
     try {
+        if (!validateFiles(req, res)) return;
         const file = req.files[0];
         const pdf = await PDFDocument.load(fs.readFileSync(file.path));
         const zipFileName = `split_${Date.now()}.zip`;
         const zipPath = path.join(__dirname, 'outputs', zipFileName);
         if (!fs.existsSync('outputs')) fs.mkdirSync('outputs');
         const output = fs.createWriteStream(zipPath);
-        const archive = archiver('zip', { zlib: { level: 9 } });
+        const { ZipArchive } = require('archiver');
+        const archive = new ZipArchive();
         archive.pipe(output);
         for (let i = 0; i < pdf.getPageCount(); i++) {
             const single = await PDFDocument.create();
@@ -115,15 +131,18 @@ app.post('/api/pdf/split', upload.array('files'), async (req, res) => {
             single.addPage(page);
             archive.append(Buffer.from(await single.save()), { name: `page_${i + 1}.pdf` });
         }
+        output.on('close', () => {
+            fs.unlinkSync(file.path);
+            res.json({ downloadUrl: `/api/download/${zipFileName}` });
+        });
         await archive.finalize();
-        fs.unlinkSync(file.path);
-        output.on('close', () => res.json({ downloadUrl: `/api/download/${zipFileName}` }));
     } catch (e) { res.status(500).json({ error: 'Split Error' }); }
 });
 
 // PDF Protect (Encryption)
 app.post('/api/pdf/protect', upload.array('files'), async (req, res) => {
     try {
+        if (!validateFiles(req, res)) return;
         const password = req.body.password;
         if (!password) return res.status(400).json({ error: 'Password required' });
         const inputPath = req.files[0].path;
@@ -145,6 +164,7 @@ app.post('/api/pdf/protect', upload.array('files'), async (req, res) => {
 // PDF Unlock (Decryption)
 app.post('/api/pdf/unlock', upload.array('files'), async (req, res) => {
     try {
+        if (!validateFiles(req, res)) return;
         const password = req.body.password;
         const inputPath = req.files[0].path;
         const fileName = `unlocked_${Date.now()}.pdf`;
@@ -161,6 +181,7 @@ app.post('/api/pdf/unlock', upload.array('files'), async (req, res) => {
 // PDF Watermark
 app.post('/api/pdf/watermark', upload.array('files'), async (req, res) => {
     try {
+        if (!validateFiles(req, res)) return;
         const text = req.body.watermark || 'CONFIDENTIAL';
         const pdfDoc = await PDFDocument.load(fs.readFileSync(req.files[0].path));
         const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -190,6 +211,7 @@ app.post('/api/pdf/watermark', upload.array('files'), async (req, res) => {
 // PDF Sign
 app.post('/api/pdf/sign', upload.array('files'), async (req, res) => {
     try {
+        if (!validateFiles(req, res)) return;
         const signText = req.body.signature || 'Signed';
         const pdfDoc = await PDFDocument.load(fs.readFileSync(req.files[0].path));
         const font = await pdfDoc.embedFont(StandardFonts.TimesRomanItalic);
@@ -215,6 +237,7 @@ app.post('/api/pdf/sign', upload.array('files'), async (req, res) => {
 // PDF Remove/Extract Pages
 app.post(['/api/pdf/remove', '/api/pdf/extract'], upload.array('files'), async (req, res) => {
     try {
+        if (!validateFiles(req, res)) return;
         const indices = JSON.parse(req.body.indices || '[]');
         const isExtract = req.path.includes('extract');
         const pdfDoc = await PDFDocument.load(fs.readFileSync(req.files[0].path));
@@ -237,6 +260,7 @@ app.post(['/api/pdf/remove', '/api/pdf/extract'], upload.array('files'), async (
 // PDF Rotate
 app.post('/api/pdf/rotate', upload.array('files'), async (req, res) => {
     try {
+        if (!validateFiles(req, res)) return;
         const degree = parseInt(req.body.degree) || 90;
         const pdfDoc = await PDFDocument.load(fs.readFileSync(req.files[0].path));
         pdfDoc.getPages().forEach(p => p.setRotation({ type: 'degrees', angle: (p.getRotation().angle + degree) % 360 }));
@@ -251,6 +275,7 @@ app.post('/api/pdf/rotate', upload.array('files'), async (req, res) => {
 // PDF Edit
 app.post('/api/pdf/edit', upload.array('files'), async (req, res) => {
     try {
+        if (!validateFiles(req, res)) return;
         const modifications = JSON.parse(req.body.modifications || '[]');
         const pdfDoc = await PDFDocument.load(fs.readFileSync(req.files[0].path));
         const pages = pdfDoc.getPages();
@@ -268,12 +293,81 @@ app.post('/api/pdf/edit', upload.array('files'), async (req, res) => {
     } catch (e) { res.status(500).json({ error: 'Edit Error' }); }
 });
 
+// PDF Compress
+app.post('/api/pdf/compress', upload.array('files'), async (req, res) => {
+    try {
+        if (!validateFiles(req, res)) return;
+        const pdfDoc = await PDFDocument.load(fs.readFileSync(req.files[0].path));
+        const fileName = `compressed_${Date.now()}.pdf`;
+        const outputPath = path.join(__dirname, 'outputs', fileName);
+        ensureOutputs();
+        fs.writeFileSync(outputPath, await pdfDoc.save());
+        fs.unlinkSync(req.files[0].path);
+        res.json({ downloadUrl: `/api/download/${fileName}` });
+    } catch (e) { res.status(500).json({ error: 'Compress Error' }); }
+});
+
+// Convert: Excel/CSV to PDF
+app.post('/api/pdf/convert-to', upload.array('files'), async (req, res) => {
+    try {
+        if (!validateFiles(req, res)) return;
+        const combinedData = [];
+        for (const file of req.files) {
+            const workbook = xlsx.readFile(file.path);
+            const data = xlsx.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+            combinedData.push(...data);
+            fs.unlinkSync(file.path);
+        }
+        const pdfDoc = await PDFDocument.create();
+        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        let page = pdfDoc.addPage([612, 792]);
+        let y = 750;
+        const headers = combinedData.length > 0 ? Object.keys(combinedData[0]) : [];
+        for (const row of combinedData) {
+            if (y < 50) { page = pdfDoc.addPage([612, 792]); y = 750; }
+            const line = headers.map(h => row[h] ?? '').join(' | ');
+            page.drawText(line.substring(0, 100), { x: 50, y, size: 8, font });
+            y -= 14;
+        }
+        const fileName = `converted_${Date.now()}.pdf`;
+        const outputPath = path.join(__dirname, 'outputs', fileName);
+        ensureOutputs();
+        fs.writeFileSync(outputPath, await pdfDoc.save());
+        res.json({ downloadUrl: `/api/download/${fileName}` });
+    } catch (e) { res.status(500).json({ error: 'Conversion Error' }); }
+});
+
+// Convert: PDF to Excel
+app.post('/api/pdf/convert-from', upload.array('files'), async (req, res) => {
+    try {
+        if (!validateFiles(req, res)) return;
+        // Extract text from PDF and create Excel
+        const rows = [];
+        for (const file of req.files) {
+            const pdfDoc = await PDFDocument.load(fs.readFileSync(file.path));
+            const pages = pdfDoc.getPages();
+            pages.forEach((page, i) => rows.push({ page: i + 1, text: '(PDF text extraction placeholder)' }));
+            fs.unlinkSync(file.path);
+        }
+        const workbook = xlsx.utils.book_new();
+        xlsx.utils.book_append_sheet(workbook, xlsx.utils.json_to_sheet(rows), 'Data');
+        const fileName = `extracted_${Date.now()}.xlsx`;
+        const outputPath = path.join(__dirname, 'outputs', fileName);
+        ensureOutputs();
+        xlsx.writeFile(workbook, outputPath);
+        res.json({ downloadUrl: `/api/download/${fileName}` });
+    } catch (e) { res.status(500).json({ error: 'Extraction Error' }); }
+});
+
 app.get('/api/download/:filename', (req, res) => {
     const filePath = path.join(__dirname, 'outputs', req.params.filename);
     if (fs.existsSync(filePath)) res.download(filePath, () => fs.unlinkSync(filePath));
     else res.status(404).send('Not Found');
 });
 
-app.get('/{*path}', (req, res) => res.sendFile(path.join(__dirname, '../client/dist/index.html')));
+app.use((req, res) => {
+  if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'Not found' });
+  res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+});
 
 app.listen(port, () => console.log(`Server running on port ${port}`));
