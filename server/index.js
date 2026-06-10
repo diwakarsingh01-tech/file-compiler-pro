@@ -31,14 +31,22 @@ const getHeaders = (sheet) => {
 
 app.post('/api/upload', upload.array('files'), (req, res) => {
     try {
+        const compressionLevel = req.body.level || 'recommended'; // low, recommended, extreme
+        
         if (!req.files || req.files.length === 0) {
             console.log('Upload attempt with no files.');
             return res.status(400).json({ error: 'No files uploaded.' });
         }
 
-        console.log(`Processing ${req.files.length} files...`);
+        console.log(`Processing ${req.files.length} files with level: ${compressionLevel}`);
         let combinedData = [];
         let masterHeaders = null;
+        let stats = {
+            originalRows: 0,
+            cleanedRows: 0,
+            removedDuplicates: 0,
+            removedEmpty: 0
+        };
 
         for (const file of req.files) {
             console.log(`Reading file: ${file.originalname}`);
@@ -50,10 +58,8 @@ app.post('/api/upload', upload.array('files'), (req, res) => {
             
             if (!masterHeaders) {
                 masterHeaders = headers;
-                console.log('Master headers set:', masterHeaders);
             } else {
                 if (JSON.stringify(headers) !== JSON.stringify(masterHeaders)) {
-                    console.error(`Header mismatch in ${file.originalname}`);
                     req.files.forEach(f => { if(fs.existsSync(f.path)) fs.unlinkSync(f.path) });
                     return res.status(400).json({ 
                         error: `Header mismatch in file: ${file.originalname}` 
@@ -62,38 +68,48 @@ app.post('/api/upload', upload.array('files'), (req, res) => {
             }
 
             const data = xlsx.utils.sheet_to_json(sheet);
-            
-            // CLEANING & COMPRESSION: Filter out empty rows and trim strings
-            const cleanedData = data.filter(row => {
-                const values = Object.values(row);
-                return values.some(val => val !== null && val !== undefined && String(val).trim() !== '');
-            }).map(row => {
-                const trimmedRow = {};
-                for (const key in row) {
-                    if (typeof row[key] === 'string') {
-                        trimmedRow[key] = row[key].trim();
-                    } else {
-                        trimmedRow[key] = row[key];
-                    }
-                }
-                return trimmedRow;
-            });
+            stats.originalRows += data.length;
 
-            combinedData = combinedData.concat(cleanedData);
-            console.log(`Added ${cleanedData.length} cleaned rows from ${file.originalname}`);
-            
+            let processedData = data;
+
+            if (compressionLevel === 'recommended' || compressionLevel === 'extreme') {
+                // Filter out empty rows and trim strings
+                processedData = data.filter(row => {
+                    const values = Object.values(row);
+                    const isEmpty = !values.some(val => val !== null && val !== undefined && String(val).trim() !== '');
+                    if (isEmpty) stats.removedEmpty++;
+                    return !isEmpty;
+                }).map(row => {
+                    const trimmedRow = {};
+                    for (const key in row) {
+                        if (typeof row[key] === 'string') {
+                            trimmedRow[key] = row[key].trim();
+                        } else {
+                            trimmedRow[key] = row[key];
+                        }
+                    }
+                    return trimmedRow;
+                });
+            }
+
+            combinedData = combinedData.concat(processedData);
             if(fs.existsSync(file.path)) fs.unlinkSync(file.path);
         }
 
-        // REMOVE DUPLICATES: Condense the data further
-        const uniqueData = Array.from(new Set(combinedData.map(JSON.stringify))).map(JSON.parse);
-        console.log(`Condensing: Reduced from ${combinedData.length} to ${uniqueData.length} unique rows.`);
+        let finalData = combinedData;
+        if (compressionLevel === 'extreme') {
+            const initialCount = combinedData.length;
+            finalData = Array.from(new Set(combinedData.map(JSON.stringify))).map(JSON.parse);
+            stats.removedDuplicates = initialCount - finalData.length;
+        }
+
+        stats.finalRows = finalData.length;
 
         const newWorkbook = xlsx.utils.book_new();
-        const newSheet = xlsx.utils.json_to_sheet(uniqueData);
+        const newSheet = xlsx.utils.json_to_sheet(finalData);
         xlsx.utils.book_append_sheet(newWorkbook, newSheet, 'CombinedData');
 
-        const fileName = `compressed_merged_${Date.now()}.xlsx`;
+        const fileName = `${compressionLevel}_merged_${Date.now()}.xlsx`;
         const outputsDir = path.join(__dirname, 'outputs');
         const filePath = path.join(outputsDir, fileName);
 
@@ -101,14 +117,14 @@ app.post('/api/upload', upload.array('files'), (req, res) => {
             fs.mkdirSync(outputsDir);
         }
 
-        // Use maximum compression for the XLSX file
         xlsx.writeFile(newWorkbook, filePath, { compression: true });
-        console.log(`Optimized merged file created: ${fileName}`);
+        console.log(`Optimized merged file created: ${fileName}`, stats);
 
         res.json({ 
-            message: 'Files merged successfully', 
+            message: 'Files processed successfully', 
             downloadUrl: `/api/download/${fileName}`,
-            preview: combinedData.slice(0, 5) 
+            preview: finalData.slice(0, 5),
+            stats: stats
         });
 
     } catch (error) {

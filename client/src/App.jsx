@@ -1,34 +1,47 @@
-import React, { useState, useCallback } from 'react';
-import { Upload, FileText, Download, X, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { 
+  Upload, 
+  FileSpreadsheet, 
+  Download, 
+  X, 
+  Plus, 
+  ShieldCheck, 
+  Zap, 
+  Check,
+  Loader2,
+  Trash2,
+  Share2
+} from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = window.location.origin;
 
 function App() {
   const [files, setFiles] = useState([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const [error, setError] = useState(null);
+  const [compressionLevel, setCompressionLevel] = useState('recommended');
+  const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
 
   const onFileChange = (e) => {
     const selectedFiles = Array.from(e.target.files);
     setFiles((prev) => [...prev, ...selectedFiles]);
     setError(null);
-    setResult(null);
   };
 
   const removeFile = (index) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
+    if (files.length <= 1) setResult(null);
   };
 
   const handleProcess = async () => {
     if (files.length === 0) return;
-
-    setIsUploading(true);
+    setIsProcessing(true);
     setError(null);
 
     const formData = new FormData();
     files.forEach((file) => formData.append('files', file));
+    formData.append('level', compressionLevel);
 
     try {
       const response = await axios.post(`${API_URL}/api/upload`, formData, {
@@ -36,126 +49,149 @@ function App() {
       });
       setResult(response.data);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to process files. Please try again.');
+      setError(err.response?.data?.error || 'Failed to process files.');
     } finally {
-      setIsUploading(false);
+      setIsProcessing(false);
     }
   };
 
-  return (
-    <div className="app-container">
-      <header>
-        <h1>File Compiler Pro</h1>
-        <p>Consolidate Excel and CSV files into a master report seamlessly.</p>
-      </header>
+  const reset = () => {
+    setFiles([]);
+    setResult(null);
+    setError(null);
+  };
 
-      <main>
-        <div className="upload-card">
-          <div 
-            className="drop-zone"
-            onClick={() => document.getElementById('fileInput').click()}
-          >
-            <Upload size={48} color="var(--primary)" style={{ marginBottom: '1rem' }} />
-            <h3>Click or Drag & Drop Files</h3>
-            <p>Support for .xlsx and .csv files</p>
-            <input 
-              id="fileInput"
-              type="file" 
-              multiple 
-              hidden 
-              accept=".xlsx,.csv" 
-              onChange={onFileChange}
-            />
+  // 1. Initial Selection View
+  if (files.length === 0 && !result) {
+    return (
+      <div className="app-wrapper">
+        <header className="premium-header">
+          <div className="logo"><FileSpreadsheet size={32} /> ILoveExcel</div>
+        </header>
+        <main className="hero">
+          <h1>Compress EXCEL</h1>
+          <p>Compress and merge Excel and CSV files without losing quality.</p>
+          <div className="select-btn" onClick={() => document.getElementById('fileInput').click()}>
+            Select Excel files
           </div>
+          <input id="fileInput" type="file" multiple hidden accept=".xlsx,.csv" onChange={onFileChange} />
+        </main>
+      </div>
+    );
+  }
 
-          {files.length > 0 && (
-            <div className="file-list">
-              {files.map((file, idx) => (
-                <div key={idx} className="file-item">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <FileText size={18} />
-                    <span>{file.name}</span>
-                  </div>
-                  <X 
-                    size={18} 
-                    style={{ cursor: 'pointer', color: 'var(--secondary)' }} 
-                    onClick={() => removeFile(idx)}
-                  />
-                </div>
-              ))}
-              
-              <button 
-                className="btn btn-primary" 
-                onClick={handleProcess}
-                disabled={isUploading}
-                style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-              >
-                {isUploading ? (
-                  <>
-                    <Loader2 className="animate-spin" size={20} />
-                    Processing...
-                  </>
-                ) : (
-                  'Compile Files'
-                )}
+  // 2. Success View
+  if (result) {
+    return (
+      <div className="app-wrapper">
+        <header className="premium-header">
+          <div className="logo" onClick={reset} style={{cursor: 'pointer'}}><FileSpreadsheet size={32} /> ILoveExcel</div>
+        </header>
+        <main className="workspace" style={{justifyContent: 'center'}}>
+          <div className="main-content success-view" style={{maxWidth: '800px'}}>
+            <h2 style={{fontSize: '2rem'}}>Excel files have been compressed!</h2>
+            <a href={`${API_URL}${result.downloadUrl}`} className="download-link">
+              Download merged Excel <Download />
+            </a>
+            
+            <div className="stats-grid">
+              <div className="stat-item">
+                <div className="stat-value">{result.stats.originalRows}</div>
+                <div className="stat-label">Original Rows</div>
+              </div>
+              <div className="stat-item">
+                <div className="stat-value">{result.stats.finalRows}</div>
+                <div className="stat-label">Final Rows</div>
+              </div>
+              <div className="stat-item">
+                <div className="stat-value">{result.stats.removedEmpty}</div>
+                <div className="stat-label">Empty Removed</div>
+              </div>
+              <div className="stat-item">
+                <div className="stat-value">{result.stats.removedDuplicates}</div>
+                <div className="stat-label">Duplicates Removed</div>
+              </div>
+            </div>
+
+            <div style={{display: 'flex', gap: '1rem', marginTop: '2rem'}}>
+              <button className="btn" onClick={reset} style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                <Trash2 size={18} /> Delete now
+              </button>
+              <button className="btn" style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                <Share2 size={18} /> Share link
               </button>
             </div>
-          )}
+          </div>
+        </main>
+      </div>
+    );
+  }
 
-          {error && (
-            <div className="error-msg">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <AlertCircle size={20} />
-                <strong>Error:</strong>
+  // 3. Workspace View (Grid + Sidebar)
+  return (
+    <div className="app-wrapper">
+      <header className="premium-header">
+        <div className="logo" onClick={reset} style={{cursor: 'pointer'}}><FileSpreadsheet size={32} /> ILoveExcel</div>
+      </header>
+      
+      <main className="workspace">
+        <div className="main-content">
+          <div className="file-grid">
+            {files.map((file, idx) => (
+              <div key={idx} className="file-card">
+                <div className="remove-btn" onClick={() => removeFile(idx)}><X size={14} /></div>
+                <div className="icon-container"><FileSpreadsheet size={64} /></div>
+                <div className="file-name">{file.name}</div>
               </div>
-              <p>{error}</p>
-            </div>
-          )}
-
-          {result && (
-            <div style={{ marginTop: '2rem', textAlign: 'center' }}>
-              <div style={{ color: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                <CheckCircle2 size={24} />
-                <h3 style={{ margin: 0 }}>Success! Files Merged Successfully.</h3>
-              </div>
-              <a 
-                href={`${API_URL}${result.downloadUrl}`} 
-                className="btn btn-success"
-                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: 'fit-content', margin: '0 auto' }}
-              >
-                <Download size={20} />
-                Download Merged File
-              </a>
-            </div>
-          )}
-        </div>
-
-        {result && result.preview && result.preview.length > 0 && (
-          <div className="preview-container">
-            <h3>Data Preview (First 5 rows)</h3>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="preview-table">
-                <thead>
-                  <tr>
-                    {Object.keys(result.preview[0]).map((header) => (
-                      <th key={header}>{header}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.preview.map((row, i) => (
-                    <tr key={i}>
-                      {Object.values(row).map((val, j) => (
-                        <td key={j}>{val}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            ))}
+            <div className="file-card add-more-card" onClick={() => document.getElementById('fileInput').click()}>
+              <Plus size={48} />
+              <input id="fileInput" type="file" multiple hidden accept=".xlsx,.csv" onChange={onFileChange} />
             </div>
           </div>
-        )}
+        </div>
+
+        <aside className="sidebar">
+          <h2>Compression options</h2>
+          
+          <div 
+            className={`option-card ${compressionLevel === 'extreme' ? 'active' : ''}`}
+            onClick={() => setCompressionLevel('extreme')}
+          >
+            <div className="option-title">Extreme Compression</div>
+            <div className="option-desc">Smallest file size. Removes duplicates and empty rows.</div>
+          </div>
+
+          <div 
+            className={`option-card ${compressionLevel === 'recommended' ? 'active' : ''}`}
+            onClick={() => setCompressionLevel('recommended')}
+          >
+            <div className="option-title">Recommended Compression</div>
+            <div className="option-desc">Good quality, good compression. Removes empty rows.</div>
+          </div>
+
+          <div 
+            className={`option-card ${compressionLevel === 'low' ? 'active' : ''}`}
+            onClick={() => setCompressionLevel('low')}
+          >
+            <div className="option-title">Low Compression</div>
+            <div className="option-desc">High quality, low compression. Just merges files.</div>
+          </div>
+
+          {error && <div className="error-msg" style={{marginBottom: '1rem'}}>{error}</div>}
+
+          <button className="action-btn" onClick={handleProcess} disabled={isProcessing}>
+            {isProcessing ? 'COMPRESSING...' : 'Compress & Merge'}
+          </button>
+        </aside>
       </main>
+
+      {isProcessing && (
+        <div className="loading-overlay">
+          <Loader2 size={64} className="animate-spin" color="var(--primary)" />
+          <h2 style={{marginTop: '2rem'}}>Merging and compressing your files...</h2>
+        </div>
+      )}
     </div>
   );
 }
