@@ -67,6 +67,8 @@ function App() {
   const [toasts, setToasts] = useState([]);
   const [dragging, setDragging] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [availableSheets, setAvailableSheets] = useState([]);
+  const [selectedSheet, setSelectedSheet] = useState('');
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -126,6 +128,25 @@ function App() {
     }
   }, [currentTool, files]);
 
+  useEffect(() => {
+    if (currentTool !== 'excel-merge' || files.length === 0) {
+      setAvailableSheets([]);
+      setSelectedSheet('');
+      return;
+    }
+    const excelFile = files.find(f => f.name.endsWith('.xlsx'));
+    if (!excelFile) { setAvailableSheets([]); setSelectedSheet(''); return; }
+    const fd = new FormData();
+    fd.append('file', excelFile);
+    axios.post(`${API_URL}/api/files/sheets`, fd).then(r => {
+      setAvailableSheets(r.data.sheets);
+      setSelectedSheet(r.data.sheets[0] || '');
+    }).catch(() => {
+      setAvailableSheets([]);
+      setSelectedSheet('');
+    });
+  }, [currentTool, files]);
+
   const renderPage = async (pdf, pageNum) => {
     if (!pdf) return;
     try {
@@ -165,6 +186,7 @@ function App() {
     formData.append('indices', JSON.stringify(selectedPages));
     formData.append('degree', rotation);
     formData.append('modifications', JSON.stringify(modifications));
+    if (selectedSheet) formData.append('sheetName', selectedSheet);
 
     let endpoint = '/api/upload';
     if (currentTool.startsWith('pdf-')) endpoint = `/api/pdf/${currentTool.split('-')[1]}`;
@@ -190,6 +212,7 @@ function App() {
     setFiles([]); setResult(null); setError(null); setModifications([]);
     setRotation(0); setPdfDoc(null); setPassword(''); setSignatureName('');
     setSelectedPages([]); setCurrentTool('home'); setCurrentPage(1);
+    setAvailableSheets([]); setSelectedSheet('');
   };
 
   const copyDownloadLink = () => {
@@ -322,14 +345,24 @@ function App() {
       )}
 
       {currentTool === 'excel-merge' && (
-        <div className="input-group">
-          <label>Compression</label>
-          <select value={compressionLevel} onChange={(e) => setCompressionLevel(e.target.value)}>
-            <option value="low">Low</option>
-            <option value="recommended">Recommended</option>
-            <option value="extreme">Extreme (dedup)</option>
-          </select>
-        </div>
+        <>
+          {availableSheets.length > 0 && (
+            <div className="input-group">
+              <label>Select Sheet</label>
+              <select value={selectedSheet} onChange={(e) => setSelectedSheet(e.target.value)}>
+                {availableSheets.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          )}
+          <div className="input-group">
+            <label>Compression</label>
+            <select value={compressionLevel} onChange={(e) => setCompressionLevel(e.target.value)}>
+              <option value="low">Low</option>
+              <option value="recommended">Recommended</option>
+              <option value="extreme">Extreme (dedup)</option>
+            </select>
+          </div>
+        </>
       )}
 
       <button className="action-btn" onClick={handleProcess} disabled={isProcessing || files.length === 0}>

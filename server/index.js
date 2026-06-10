@@ -41,9 +41,11 @@ app.post('/api/upload', upload.array('files'), (req, res) => {
         let masterHeaders = null;
         let stats = { originalRows: 0, removedDuplicates: 0, removedEmpty: 0 };
 
+        const sheetName = req.body.sheetName || null;
         for (const file of req.files) {
             const workbook = xlsx.readFile(file.path);
-            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const name = sheetName && workbook.SheetNames.includes(sheetName) ? sheetName : workbook.SheetNames[0];
+            const sheet = workbook.Sheets[name];
             const headers = getHeaders(sheet);
             if (!masterHeaders) { masterHeaders = headers; }
             else if (JSON.stringify(headers) !== JSON.stringify(masterHeaders)) {
@@ -92,6 +94,16 @@ const validateFiles = (req, res, min = 1) => {
 };
 
 const ensureOutputs = () => { if (!fs.existsSync('outputs')) fs.mkdirSync('outputs'); };
+
+// Get Excel sheet names
+app.post('/api/files/sheets', upload.single('file'), (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+        const workbook = xlsx.readFile(req.file.path);
+        fs.unlinkSync(req.file.path);
+        res.json({ sheets: workbook.SheetNames });
+    } catch (e) { res.status(500).json({ error: 'Failed to read sheets' }); }
+});
 
 // PDF Merge
 app.post('/api/pdf/merge', upload.array('files'), async (req, res) => {
