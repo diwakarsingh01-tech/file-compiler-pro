@@ -62,17 +62,38 @@ app.post('/api/upload', upload.array('files'), (req, res) => {
             }
 
             const data = xlsx.utils.sheet_to_json(sheet);
-            combinedData = combinedData.concat(data);
-            console.log(`Added ${data.length} rows from ${file.originalname}`);
+            
+            // CLEANING & COMPRESSION: Filter out empty rows and trim strings
+            const cleanedData = data.filter(row => {
+                const values = Object.values(row);
+                return values.some(val => val !== null && val !== undefined && String(val).trim() !== '');
+            }).map(row => {
+                const trimmedRow = {};
+                for (const key in row) {
+                    if (typeof row[key] === 'string') {
+                        trimmedRow[key] = row[key].trim();
+                    } else {
+                        trimmedRow[key] = row[key];
+                    }
+                }
+                return trimmedRow;
+            });
+
+            combinedData = combinedData.concat(cleanedData);
+            console.log(`Added ${cleanedData.length} cleaned rows from ${file.originalname}`);
             
             if(fs.existsSync(file.path)) fs.unlinkSync(file.path);
         }
 
+        // REMOVE DUPLICATES: Condense the data further
+        const uniqueData = Array.from(new Set(combinedData.map(JSON.stringify))).map(JSON.parse);
+        console.log(`Condensing: Reduced from ${combinedData.length} to ${uniqueData.length} unique rows.`);
+
         const newWorkbook = xlsx.utils.book_new();
-        const newSheet = xlsx.utils.json_to_sheet(combinedData);
+        const newSheet = xlsx.utils.json_to_sheet(uniqueData);
         xlsx.utils.book_append_sheet(newWorkbook, newSheet, 'CombinedData');
 
-        const fileName = `merged_${Date.now()}.xlsx`;
+        const fileName = `compressed_merged_${Date.now()}.xlsx`;
         const outputsDir = path.join(__dirname, 'outputs');
         const filePath = path.join(outputsDir, fileName);
 
@@ -80,8 +101,9 @@ app.post('/api/upload', upload.array('files'), (req, res) => {
             fs.mkdirSync(outputsDir);
         }
 
-        xlsx.writeFile(newWorkbook, filePath);
-        console.log(`Merged file created: ${fileName}`);
+        // Use maximum compression for the XLSX file
+        xlsx.writeFile(newWorkbook, filePath, { compression: true });
+        console.log(`Optimized merged file created: ${fileName}`);
 
         res.json({ 
             message: 'Files merged successfully', 
