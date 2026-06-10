@@ -145,27 +145,73 @@ app.post('/api/pdf/split', upload.array('files'), async (req, res) => {
     }
 });
 
-// PDF Edit (Simplistic Backend Logic for Text Overlays)
+// --- PDF POWER TOOLS ---
+
+// PDF Rotate
+app.post('/api/pdf/rotate', upload.array('files'), async (req, res) => {
+    try {
+        if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No file uploaded.' });
+        const degree = parseInt(req.body.degree) || 90;
+        const pdfDoc = await PDFDocument.load(fs.readFileSync(req.files[0].path));
+        const pages = pdfDoc.getPages();
+        pages.forEach(page => page.setRotation({ type: 'degrees', angle: (page.getRotation().angle + degree) % 360 }));
+        
+        const fileName = `rotated_${Date.now()}.pdf`;
+        const filePath = path.join(__dirname, 'outputs', fileName);
+        if (!fs.existsSync('outputs')) fs.mkdirSync('outputs');
+        fs.writeFileSync(filePath, await pdfDoc.save());
+        fs.unlinkSync(req.files[0].path);
+        res.json({ downloadUrl: `/api/download/${fileName}`, stats: { pages: pages.length } });
+    } catch (error) {
+        res.status(500).json({ error: 'PDF rotation error' });
+    }
+});
+
+// PDF Remove Pages
+app.post('/api/pdf/remove', upload.array('files'), async (req, res) => {
+    try {
+        if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No file uploaded.' });
+        const indicesToRemove = JSON.parse(req.body.indices || '[]'); // 0-based
+        const pdfDoc = await PDFDocument.load(fs.readFileSync(req.files[0].path));
+        
+        indicesToRemove.sort((a, b) => b - a).forEach(index => pdfDoc.removePage(index));
+        
+        const fileName = `removed_pages_${Date.now()}.pdf`;
+        const filePath = path.join(__dirname, 'outputs', fileName);
+        if (!fs.existsSync('outputs')) fs.mkdirSync('outputs');
+        fs.writeFileSync(filePath, await pdfDoc.save());
+        fs.unlinkSync(req.files[0].path);
+        res.json({ downloadUrl: `/api/download/${fileName}`, stats: { pages: pdfDoc.getPageCount() } });
+    } catch (error) {
+        res.status(500).json({ error: 'PDF page removal error' });
+    }
+});
+
+// PDF Protect
+app.post('/api/pdf/protect', (req, res) => {
+    res.status(501).json({ error: 'Encryption feature coming soon.' });
+});
+
+// PDF Edit
 app.post('/api/pdf/edit', upload.array('files'), async (req, res) => {
     try {
         if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No file uploaded.' });
-        const file = req.files[0];
         const modifications = JSON.parse(req.body.modifications || '[]');
-        const pdfDoc = await PDFDocument.load(fs.readFileSync(file.path));
+        const pdfDoc = await PDFDocument.load(fs.readFileSync(req.files[0].path));
         const pages = pdfDoc.getPages();
 
         for (const mod of modifications) {
             const page = pages[mod.pageIndex];
             if (page && mod.type === 'text') {
-                page.drawText(mod.text, { x: mod.x, y: mod.y, size: mod.size || 12, color: rgb(0,0,0) });
+                page.drawText(mod.text, { x: mod.x, y: mod.y, size: 14, color: rgb(0,0,0) });
             }
         }
 
-        const fileName = `pdf_edited_${Date.now()}.pdf`;
+        const fileName = `edited_${Date.now()}.pdf`;
         const filePath = path.join(__dirname, 'outputs', fileName);
         if (!fs.existsSync('outputs')) fs.mkdirSync('outputs');
         fs.writeFileSync(filePath, await pdfDoc.save());
-        fs.unlinkSync(file.path);
+        fs.unlinkSync(req.files[0].path);
         res.json({ downloadUrl: `/api/download/${fileName}`, stats: { pages: pages.length } });
     } catch (error) {
         res.status(500).json({ error: 'PDF edit error' });
