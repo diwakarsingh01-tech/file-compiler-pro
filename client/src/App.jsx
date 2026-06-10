@@ -29,9 +29,10 @@ function App() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   
-  // Editor State
+  // Advanced Tool States
   const [modifications, setModifications] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [rotation, setRotation] = useState(0);
   const [pdfDoc, setPdfDoc] = useState(null);
   const canvasRef = useRef(null);
 
@@ -41,9 +42,10 @@ function App() {
     setError(null);
   };
 
-  // Load PDF for Editor
+  // Load PDF for Editor/Viewer
   useEffect(() => {
-    if (currentTool === 'pdf-edit' && files.length > 0) {
+    const needsViewer = ['pdf-edit', 'pdf-rotate', 'pdf-remove'].includes(currentTool);
+    if (needsViewer && files.length > 0) {
       const file = files[0];
       const reader = new FileReader();
       reader.onload = async (e) => {
@@ -58,8 +60,9 @@ function App() {
   }, [currentTool, files]);
 
   const renderPage = async (pdf, pageNum) => {
+    if (!pdf) return;
     const page = await pdf.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 1.5 });
+    const viewport = page.getViewport({ scale: 1.2 });
     const canvas = canvasRef.current;
     if (!canvas) return;
     const context = canvas.getContext('2d');
@@ -84,8 +87,8 @@ function App() {
       setModifications([...modifications, {
         type: 'text',
         text,
-        x: x / 1.5,
-        y: (canvasRef.current.height - y) / 1.5,
+        x: x / 1.2,
+        y: (canvasRef.current.height - y) / 1.2,
         pageIndex: currentPage - 1
       }]);
     }
@@ -103,6 +106,10 @@ function App() {
     let endpoint = '/api/upload';
     if (currentTool === 'pdf-merge') endpoint = '/api/pdf/merge';
     if (currentTool === 'pdf-split') endpoint = '/api/pdf/split';
+    if (currentTool === 'pdf-rotate') {
+      endpoint = '/api/pdf/rotate';
+      formData.append('degree', rotation);
+    }
     if (currentTool === 'pdf-edit') {
       endpoint = '/api/pdf/edit';
       formData.append('modifications', JSON.stringify(modifications));
@@ -125,6 +132,7 @@ function App() {
     setResult(null);
     setError(null);
     setModifications([]);
+    setRotation(0);
     setPdfDoc(null);
     setCurrentTool('home');
   };
@@ -238,7 +246,7 @@ function App() {
       <main style={{flex: 1, background: 'var(--bg-light)', overflowY: 'auto'}}>
         {currentTool === 'home' ? (
           <div className="hero">
-            <h1>All the tools you need for PDF & Excel</h1>
+            <h1>Every tool you need for PDF & Excel</h1>
             <p>100% Free and Private</p>
             {renderDashboard()}
           </div>
@@ -270,22 +278,31 @@ function App() {
                     onChange={onFileChange} 
                   />
                 </div>
-              ) : currentTool === 'pdf-edit' ? (
+              ) : ['pdf-edit', 'pdf-rotate'].includes(currentTool) ? (
                 <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem'}}>
-                  <div style={{background: '#eee', padding: '10px', borderRadius: '5px', display: 'flex', gap: '10px'}}>
-                    <button onClick={() => { if(currentPage > 1) { setCurrentPage(currentPage-1); renderPage(pdfDoc, currentPage-1); }}}>Prev</button>
-                    <span>Page {currentPage} of {pdfDoc?.numPages}</span>
-                    <button onClick={() => { if(currentPage < pdfDoc?.numPages) { setCurrentPage(currentPage+1); renderPage(pdfDoc, currentPage+1); }}}>Next</button>
-                    <div style={{borderLeft: '1px solid #ccc', margin: '0 10px'}}></div>
-                    <span style={{fontSize: '0.8rem', color: '#666'}}><Type size={14} /> Click anywhere on page to add text</span>
+                  <div style={{background: '#eee', padding: '10px', borderRadius: '5px', display: 'flex', gap: '10px', alignItems: 'center'}}>
+                    {currentTool === 'pdf-rotate' ? (
+                      <>
+                        <button onClick={() => setRotation((rotation + 90) % 360)}>Rotate Right (90°)</button>
+                        <span style={{fontWeight: 'bold'}}>Current Rotation: {rotation}°</span>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={() => { if(currentPage > 1) { setCurrentPage(currentPage-1); renderPage(pdfDoc, currentPage-1); }}}>Prev</button>
+                        <span>Page {currentPage} of {pdfDoc?.numPages}</span>
+                        <button onClick={() => { if(currentPage < pdfDoc?.numPages) { setCurrentPage(currentPage+1); renderPage(pdfDoc, currentPage+1); }}}>Next</button>
+                        <div style={{borderLeft: '1px solid #ccc', margin: '0 10px'}}></div>
+                        <span style={{fontSize: '0.8rem', color: '#666'}}><Type size={14} /> Click to add text</span>
+                      </>
+                    )}
                   </div>
-                  <div style={{position: 'relative', boxShadow: '0 0 20px rgba(0,0,0,0.2)'}}>
-                    <canvas ref={canvasRef} onClick={handleCanvasClick} style={{cursor: 'crosshair'}}></canvas>
-                    {modifications.filter(m => m.pageIndex === currentPage - 1).map((m, i) => (
+                  <div style={{position: 'relative', boxShadow: '0 0 20px rgba(0,0,0,0.2)', transform: `rotate(${rotation}deg)`, transition: 'transform 0.3s'}}>
+                    <canvas ref={canvasRef} onClick={handleCanvasClick} style={{cursor: currentTool === 'pdf-edit' ? 'crosshair' : 'default'}}></canvas>
+                    {currentTool === 'pdf-edit' && modifications.filter(m => m.pageIndex === currentPage - 1).map((m, i) => (
                       <div key={i} style={{
                         position: 'absolute',
-                        left: m.x * 1.5,
-                        top: canvasRef.current.height - (m.y * 1.5),
+                        left: m.x * 1.2,
+                        top: (canvasRef.current?.height || 0) - (m.y * 1.2),
                         color: 'black',
                         fontSize: '18px',
                         pointerEvents: 'none',
@@ -327,11 +344,11 @@ function App() {
               <aside className="sidebar">
                 <h2>{currentTool.replace('-', ' ')}</h2>
                 <div className="option-card active">
-                  <div className="option-title">Apply Changes</div>
-                  <div className="option-desc">This will generate your processed file.</div>
+                  <div className="option-title">Process File</div>
+                  <div className="option-desc">Apply your changes and download.</div>
                 </div>
                 <button className="action-btn" onClick={handleProcess} disabled={isProcessing}>
-                  {isProcessing ? 'PROCESSING...' : 'Process & Download'}
+                  {isProcessing ? 'PROCESSING...' : 'Download Result'}
                 </button>
               </aside>
             )}
@@ -346,7 +363,7 @@ function App() {
           flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 1000
         }}>
           <Loader2 size={64} className="animate-spin" color="var(--primary)" />
-          <h2>Finalizing your files...</h2>
+          <h2>Processing your files...</h2>
         </div>
       )}
     </div>
