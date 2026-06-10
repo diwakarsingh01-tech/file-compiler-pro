@@ -166,113 +166,186 @@ body { margin: 0; min-height: 100vh; }
   color: #777;
 }
 
-/* Workspace Views */
+/* Workspace - High Fidelity Overhaul */
 .workspace {
   flex: 1;
   display: flex;
-  background: var(--bg-light);
-  padding: 1.5rem;
-  gap: 1.5rem;
+  background: #f4f7f9;
+  padding: 2.5rem;
+  gap: 2.5rem;
+  min-height: calc(100vh - 70px);
 }
 
 .main-content {
   flex: 1;
   background: white;
-  border-radius: 12px;
-  box-shadow: var(--shadow);
-  padding: 1.5rem;
+  border-radius: 20px;
+  box-shadow: 0 15px 50px rgba(0,0,0,0.03);
+  padding: 3rem;
   display: flex;
   flex-direction: column;
+  border: 1px solid rgba(0,0,0,0.05);
 }
 
 .sidebar {
-  width: 300px;
+  width: 360px;
   background: white;
-  border-radius: 12px;
-  box-shadow: var(--shadow);
-  padding: 1.2rem;
+  border-radius: 20px;
+  box-shadow: 0 15px 50px rgba(0,0,0,0.03);
+  padding: 2.5rem;
   display: flex;
   flex-direction: column;
+  border: 1px solid rgba(0,0,0,0.05);
+  position: sticky;
+  top: 90px;
+  height: fit-content;
 }
 
-/* Hero Section */
-.hero {
-  text-align: center;
-  padding: 2rem 0;
+/* File Grid & Cards */
+.file-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 170px));
+  gap: 2.5rem;
+  padding: 1rem;
 }
 
-.hero h1 { font-size: 2.2rem; font-weight: 900; margin: 0 0 0.5rem 0; }
-.hero p { font-size: 1.1rem; color: #666; margin: 0; }
-
-/* Buttons */
-.btn {
-  padding: 0.6rem 1.2rem;
-  border-radius: 6px;
-  border: 1px solid var(--border);
+.file-card {
+  width: 170px;
+  height: 210px;
   background: white;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-size: 0.9rem;
+  border: 2px solid #f2f2f2;
+  border-radius: 14px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: grab;
 }
 
-.btn:hover {
-  background: var(--bg-light);
-  border-color: #ccc;
+.file-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-10px);
+  box-shadow: 0 15px 30px rgba(229, 50, 45, 0.12);
 }
 
-.select-btn {
-  padding: 1.2rem 3rem;
-  background: var(--primary);
+.file-card .remove-btn {
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  background: #2d3436;
   color: white;
-  font-size: 1.5rem;
-  font-weight: 800;
-  border-radius: 8px;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(229, 50, 45, 0.2);
+  border: 3px solid white;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.15);
   transition: all 0.2s;
-  display: inline-block;
+  z-index: 10;
+}
+
+.file-card .remove-btn:hover {
+  background: var(--primary);
+  transform: scale(1.15) rotate(90deg);
+}
+
+.file-card .icon-container {
   margin-top: 1.5rem;
+  color: var(--primary);
+  opacity: 0.95;
 }
 
-.select-btn:hover {
-  transform: translateY(-2px);
-  background: var(--primary-dark);
-  box-shadow: 0 6px 16px rgba(229, 50, 45, 0.3);
+.file-card.excel .icon-container { color: var(--excel); }
+
+.file-name {
+  margin-top: auto;
+  font-size: 0.85rem;
+  text-align: center;
+  font-weight: 700;
+  color: #2d3436;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+.add-more-card {
+  border: 2px dashed #b2bec3;
+  background: #fbfbfc;
+  color: #636e72;
+}
+
+.add-more-card:hover {
+  border-color: var(--primary);
+  background: #fff5f5;
+  color: var(--primary);
+}
+
+/* Sidebar Options */
+.sidebar h2 {
+  font-size: 1.6rem;
+  font-weight: 900;
+  margin-bottom: 2rem;
+  color: #2d3436;
+  border-bottom: 3px solid #f1f2f6;
+  padding-bottom: 1rem;
+  text-transform: capitalize;
+}
+
+.option-card {
+  border: 2px solid #f1f2f6;
+  border-radius: 14px;
+  padding: 1.5rem;
+  margin-bottom: 1.2rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #fafbfc;
+}
+
+.option-card.active {
+  border-color: var(--primary);
+  background: #fff5f5;
+  box-shadow: 0 5px 20px rgba(229, 50, 45, 0.08);
+}
+
+.option-title {
+  font-weight: 800;
+  font-size: 1.05rem;
+  margin-bottom: 0.5rem;
+  color: #2d3436;
+}
+
+.option-desc {
+  font-size: 0.85rem;
+  color: #636e72;
+  line-height: 1.5;
+}
+
+/* Action Button 2.0 */
 .action-btn {
   width: 100%;
-  padding: 1rem;
+  padding: 1.4rem;
   background: var(--primary);
   color: white;
   border: none;
-  border-radius: 6px;
-  font-size: 1.1rem;
-  font-weight: 700;
+  border-radius: 14px;
+  font-size: 1.3rem;
+  font-weight: 900;
   cursor: pointer;
-  margin-top: auto;
-  transition: background 0.2s;
+  margin-top: 2.5rem;
+  box-shadow: 0 10px 25px rgba(229, 50, 45, 0.3);
+  transition: all 0.3s;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
 }
 
 .action-btn:hover:not(:disabled) {
   background: var(--primary-dark);
-}
-
-.action-btn:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-}
-
-.download-link {
-  background: var(--primary);
-  color: white;
-  padding: 1.2rem 2.5rem;
-  border-radius: 8px;
-  font-size: 1.3rem;
-  font-weight: 800;
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
+  transform: translateY(-3px);
+  box-shadow: 0 15px 35px rgba(229, 50, 45, 0.4);
 }

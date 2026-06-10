@@ -245,9 +245,15 @@ function App() {
         ) : (
           <div className="workspace">
             <div className="main-content">
+              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem'}}>
+                <h2 style={{margin: 0, fontSize: '1.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#1a1a1a'}}>
+                  {currentTool.replace(/-/g, ' ')}
+                </h2>
+                <button className="btn" onClick={reset} style={{color: '#666'}}>Cancel</button>
+              </div>
+
               {files.length === 0 ? (
-                <div className="hero">
-                  <h2 style={{textTransform: 'uppercase'}}>{currentTool.replace(/-/g, ' ')}</h2>
+                <div className="hero" style={{padding: '4rem 0'}}>
                   <div className="select-btn" onClick={() => document.getElementById('fileInput').click()}>
                     Select File
                   </div>
@@ -259,27 +265,28 @@ function App() {
                     accept={activeSegment === 'pdf' ? '.pdf' : '.xlsx,.csv'} 
                     onChange={onFileChange} 
                   />
+                  <p style={{marginTop: '1.5rem', color: '#888'}}>or drag and drop files here</p>
                 </div>
               ) : ['pdf-edit', 'pdf-rotate'].includes(currentTool) ? (
-                <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem'}}>
-                  <div style={{background: 'white', padding: '10px', borderRadius: '8px', boxShadow: 'var(--shadow)', display: 'flex', gap: '10px', alignItems: 'center'}}>
+                <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem'}}>
+                  <div style={{background: 'white', padding: '0.75rem 1.5rem', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', display: 'flex', gap: '15px', alignItems: 'center', border: '1px solid #f0f0f0'}}>
                     {currentTool === 'pdf-rotate' ? (
                       <>
                         <button className="btn" onClick={() => setRotation((rotation + 90) % 360)}>Rotate +90°</button>
-                        <span style={{fontWeight: 'bold'}}>{rotation}°</span>
+                        <span style={{fontWeight: '800', color: 'var(--primary)'}}>{rotation}°</span>
                       </>
                     ) : (
                       <>
-                        <button className="btn" onClick={() => { if(currentPage > 1) { setCurrentPage(currentPage-1); renderPage(pdfDoc, currentPage-1); }}}>Prev</button>
-                        <span style={{fontSize: '0.9rem'}}>Page {currentPage} of {pdfDoc?.numPages}</span>
+                        <button className="btn" onClick={() => { if(currentPage > 1) { setCurrentPage(currentPage-1); renderPage(pdfDoc, currentPage-1); }}}>Previous</button>
+                        <span style={{fontSize: '0.95rem', fontWeight: '700'}}>Page {currentPage} of {pdfDoc?.numPages}</span>
                         <button className="btn" onClick={() => { if(currentPage < pdfDoc?.numPages) { setCurrentPage(currentPage+1); renderPage(pdfDoc, currentPage+1); }}}>Next</button>
-                        <div style={{borderLeft: '1px solid #ccc', height: '20px', margin: '0 5px'}}></div>
-                        <span style={{fontSize: '0.8rem', color: '#666'}}>Click on page to add text</span>
+                        <div style={{borderLeft: '2px solid #eee', height: '24px', margin: '0 10px'}}></div>
+                        <span style={{fontSize: '0.85rem', color: '#555', display: 'flex', alignItems: 'center', gap: '5px'}}><Type size={16} /> Click on page to add text</span>
                       </>
                     )}
                   </div>
-                  <div style={{position: 'relative', boxShadow: '0 0 30px rgba(0,0,0,0.1)', transform: `rotate(${rotation}deg)`, transition: 'transform 0.3s'}}>
-                    <canvas ref={canvasRef} onClick={handleCanvasClick} style={{cursor: currentTool === 'pdf-edit' ? 'crosshair' : 'default', maxWidth: '100%'}}></canvas>
+                  <div style={{position: 'relative', boxShadow: '0 20px 60px rgba(0,0,0,0.12)', transform: `rotate(${rotation}deg)`, transition: 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)', borderRadius: '4px', overflow: 'hidden'}}>
+                    <canvas ref={canvasRef} onClick={handleCanvasClick} style={{cursor: currentTool === 'pdf-edit' ? 'crosshair' : 'default', maxWidth: '100%', display: 'block'}}></canvas>
                     {currentTool === 'pdf-edit' && modifications.filter(m => m.pageIndex === currentPage - 1).map((m, i) => (
                       <div key={i} style={{
                         position: 'absolute',
@@ -288,8 +295,11 @@ function App() {
                         color: 'black',
                         fontSize: '16px',
                         pointerEvents: 'none',
-                        background: 'rgba(255,255,0,0.3)',
-                        padding: '2px'
+                        background: 'rgba(255,255,0,0.4)',
+                        padding: '2px 4px',
+                        borderRadius: '2px',
+                        border: '1px solid rgba(0,0,0,0.1)',
+                        fontWeight: '600'
                       }}>
                         {m.text}
                       </div>
@@ -299,16 +309,17 @@ function App() {
               ) : (
                 <div className="file-grid">
                   {files.map((file, idx) => (
-                    <div key={idx} className="file-card">
-                      <div className="remove-btn" onClick={() => removeFile(idx)}><X size={14} /></div>
+                    <div key={idx} className={`file-card ${activeSegment === 'excel' ? 'excel' : ''}`}>
+                      <div className="remove-btn" onClick={() => removeFile(idx)}><X size={16} /></div>
                       <div className="icon-container">
-                        {activeSegment === 'pdf' ? <Upload size={64} /> : <FileSpreadsheet size={64} />}
+                        {activeSegment === 'pdf' ? <Upload size={72} /> : <FileSpreadsheet size={72} />}
                       </div>
                       <div className="file-name">{file.name}</div>
                     </div>
                   ))}
                   <div className="file-card add-more-card" onClick={() => document.getElementById('fileInput').click()}>
                     <Plus size={48} />
+                    <span style={{fontSize: '0.8rem', fontWeight: '700', marginTop: '10px'}}>ADD MORE</span>
                     <input 
                       id="fileInput" 
                       type="file" 
@@ -323,14 +334,33 @@ function App() {
 
             {files.length > 0 && (
               <aside className="sidebar">
-                <h2 style={{fontSize: '1.2rem', marginBottom: '1rem'}}>{currentTool.replace(/-/g, ' ')}</h2>
+                <h2>Options</h2>
                 <div className="option-card active">
-                  <div className="option-title">Standard Processing</div>
-                  <div className="option-desc">Optimal quality and speed.</div>
+                  <div className="option-title">Premium Processing</div>
+                  <div className="option-desc">High-speed processing with maximum quality retention.</div>
                 </div>
+                
+                {currentTool === 'excel-merge' && (
+                  <div style={{marginTop: '1rem'}}>
+                    <div style={{fontSize: '0.8rem', fontWeight: 800, color: '#999', marginBottom: '0.5rem'}}>COMPRESSION</div>
+                    <select 
+                      style={{width: '100%', padding: '0.75rem', borderRadius: '8px', border: '2px solid #f0f0f0', fontWeight: '600'}}
+                      value={compressionLevel}
+                      onChange={(e) => setCompressionLevel(e.target.value)}
+                    >
+                      <option value="low">Low (Keep all data)</option>
+                      <option value="recommended">Recommended (Clean data)</option>
+                      <option value="extreme">Extreme (Smallest file)</option>
+                    </select>
+                  </div>
+                )}
+
                 <button className="action-btn" onClick={handleProcess} disabled={isProcessing}>
-                  {isProcessing ? 'PROCESSING...' : 'Process & Download'}
+                  {isProcessing ? 'PROCESSING...' : `PROCEED`}
                 </button>
+                <p style={{fontSize: '0.7rem', color: '#999', textAlign: 'center', marginTop: '1.5rem'}}>
+                  By clicking proceed, you agree to our terms of service and privacy policy.
+                </p>
               </aside>
             )}
           </div>
