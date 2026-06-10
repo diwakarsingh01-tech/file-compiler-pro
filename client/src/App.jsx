@@ -347,9 +347,14 @@ function App() {
 
       <header className="premium-header">
         <div className="logo" onClick={reset}>
-          <FileSpreadsheet size={24} /> <span>DocuMax Pro</span>
+          <FileSpreadsheet size={22} /> <span>DocuMax</span>
         </div>
         <div className="header-right">
+          {currentTool !== 'home' && files.length > 0 && (
+            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', background: 'var(--bg-light)', padding: '2px 10px', borderRadius: '20px', whiteSpace: 'nowrap' }}>
+              {files.length} file{files.length > 1 ? 's' : ''}
+            </span>
+          )}
           <span className="creator-badge">by <strong>Diwakar Singh</strong></span>
           <nav className="main-nav">
             <div className={`nav-link ${currentTool === 'home' ? 'active' : ''}`} onClick={reset}>Home</div>
@@ -358,8 +363,8 @@ function App() {
             <div className={`nav-link ${activeSegment === 'excel' && currentTool === 'home' ? 'active' : ''}`}
               onClick={() => { reset(); setActiveSegment('excel'); }}>Excel</div>
           </nav>
-          <button className="theme-toggle" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
-            {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+          <button className="theme-toggle" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} aria-label="Toggle theme">
+            {theme === 'light' ? <Moon size={15} /> : <Sun size={15} />}
           </button>
         </div>
       </header>
@@ -367,25 +372,25 @@ function App() {
       <main style={{ flex: 1, background: 'var(--bg-light)', overflowY: 'auto' }}>
         {currentTool === 'home' ? (
           <div className="hero">
-            <h1>Unified File Management</h1>
-            <p>Professional PDF, Image & Excel tools in one place</p>
+            <h1>DocuMax Pro</h1>
+            <p>PDF, Image & Excel tools — one tap away</p>
             {renderDashboard()}
             <div className="site-footer">
-              &copy; 2026 <strong>DocuMax Pro Suite</strong>. Designed by <strong>Diwakar Singh</strong>
+              &copy; 2026 <strong>DocuMax Pro Suite</strong> by <strong>Diwakar Singh</strong>
             </div>
           </div>
         ) : result ? (
           <div className="workspace" style={{ justifyContent: 'center' }}>
             <div className="main-content success-view">
-              <CheckCircle2 size={64} color="#198754" />
-              <h2>Success! Your file is ready.</h2>
+              <CheckCircle2 size={56} color="#198754" />
+              <h2>Done! File ready.</h2>
               <a href={`${API_URL}${result.downloadUrl}`} className="download-link" download>
-                Download Now <Download size={20} />
+                <Download size={20} /> Download
               </a>
               <button className="copy-link-btn" onClick={copyDownloadLink}>
-                <Copy size={16} /> {copied ? 'Copied!' : 'Copy Download Link'}
+                <Copy size={16} /> {copied ? 'Copied!' : 'Copy Link'}
               </button>
-              <button className="btn" onClick={reset}>Back to Home</button>
+              <button className="btn" onClick={reset}>Back Home</button>
             </div>
           </div>
         ) : (
@@ -409,19 +414,26 @@ function App() {
                     accept={getAccept()}
                     onChange={onFileChange}
                   />
-                  <div className="select-btn">Select File</div>
-                  <div className="select-hint">or drag & drop files here</div>
-                  <div className="select-hint" style={{ marginTop: '0.3rem', fontSize: '0.75rem' }}>
-                    Max 50MB per file &bull; Private & secure processing
+                  <div className="select-btn">
+                    <Upload size={20} style={{ verticalAlign: 'middle', marginRight: 8 }} />
+                    Choose Files
+                  </div>
+                  <div className="select-hint">or tap to browse</div>
+                  <div className="select-hint" style={{ marginTop: '0.2rem', fontSize: '0.7rem' }}>
+                    Max 50MB &bull; Private & secure
                   </div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.2rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                   {['pdf-edit', 'pdf-rotate', 'pdf-remove', 'pdf-extract', 'pdf-watermark', 'pdf-sign'].includes(currentTool) && (
                     <div className="pdf-controls">
-                      <button className="btn" onClick={() => { if (currentPage > 1) { const p = currentPage - 1; setCurrentPage(p); renderPage(pdfDoc, p); }}} disabled={currentPage <= 1}>Prev</button>
-                      <span>Page {currentPage} of {pdfDoc?.numPages || '?'}</span>
-                      <button className="btn" onClick={() => { if (currentPage < pdfDoc?.numPages) { const p = currentPage + 1; setCurrentPage(p); renderPage(pdfDoc, p); }}} disabled={currentPage >= (pdfDoc?.numPages || 0)}>Next</button>
+                      <button className="btn" onClick={() => { if (currentPage > 1) { const p = currentPage - 1; setCurrentPage(p); renderPage(pdfDoc, p); }}} disabled={currentPage <= 1}>
+                        <span style={{ fontSize: '1.1rem', lineHeight: 1 }}>‹</span>
+                      </button>
+                      <span>{currentPage}/{pdfDoc?.numPages || '?'}</span>
+                      <button className="btn" onClick={() => { if (currentPage < pdfDoc?.numPages) { const p = currentPage + 1; setCurrentPage(p); renderPage(pdfDoc, p); }}} disabled={currentPage >= (pdfDoc?.numPages || 0)}>
+                        <span style={{ fontSize: '1.1rem', lineHeight: 1 }}>›</span>
+                      </button>
 
                       {(currentTool === 'pdf-remove' || currentTool === 'pdf-extract') && (
                         <label>
@@ -430,7 +442,7 @@ function App() {
                               if (e.target.checked) setSelectedPages([...selectedPages, currentPage - 1]);
                               else setSelectedPages(selectedPages.filter(p => p !== currentPage - 1));
                             }} />
-                          <strong>Select</strong>
+                          <strong>Sel</strong>
                         </label>
                       )}
                     </div>
@@ -440,15 +452,17 @@ function App() {
                     {files.map((file, idx) => renderFileCard(file, idx))}
                     <div className="file-card add-more-card" onClick={() => fileInputRef.current?.click()}>
                       <input type="file" multiple hidden accept={getAccept()} onChange={onFileChange} />
-                      <Plus size={32} />
-                      <div style={{ fontSize: '0.7rem', marginTop: '0.5rem' }}>Add More</div>
+                      <Plus size={28} />
+                      <div style={{ fontSize: '0.6rem', marginTop: '0.3rem' }}>Add</div>
                     </div>
                   </div>
 
                   {['pdf-edit', 'pdf-rotate', 'pdf-remove', 'pdf-extract', 'pdf-watermark', 'pdf-sign'].includes(currentTool) && (
-                    <div style={{ position: 'relative', boxShadow: '0 20px 60px rgba(0,0,0,0.12)', transform: `rotate(${rotation}deg)`, transition: 'transform 0.3s', borderRadius: '4px', overflow: 'hidden', maxWidth: '100%' }}>
-                      <canvas ref={canvasRef} onClick={handleCanvasClick}
-                        style={{ cursor: currentTool === 'pdf-edit' ? 'crosshair' : 'default', display: pdfDoc ? 'block' : 'none', maxWidth: '100%', height: 'auto' }} />
+                    <div style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', maxWidth: '100%', width: '100%' }}>
+                      <div style={{ transform: `rotate(${rotation}deg)`, transition: 'transform 0.3s', width: '100%' }}>
+                        <canvas ref={canvasRef} onClick={handleCanvasClick}
+                          style={{ cursor: currentTool === 'pdf-edit' ? 'crosshair' : 'default', display: pdfDoc ? 'block' : 'none', width: '100%', height: 'auto', maxHeight: '60vh' }} />
+                      </div>
                     </div>
                   )}
                 </div>
