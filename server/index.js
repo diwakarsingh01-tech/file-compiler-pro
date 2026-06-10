@@ -359,6 +359,56 @@ app.post('/api/pdf/convert-from', upload.array('files'), async (req, res) => {
     } catch (e) { res.status(500).json({ error: 'Extraction Error' }); }
 });
 
+// Image to PDF
+app.post('/api/pdf/images', upload.array('files'), async (req, res) => {
+    try {
+        if (!validateFiles(req, res)) return;
+        const pdfDoc = await PDFDocument.create();
+        for (const file of req.files) {
+            const imgBuffer = fs.readFileSync(file.path);
+            let image;
+            if (file.mimetype === 'image/png') {
+                image = await pdfDoc.embedPng(imgBuffer);
+            } else {
+                const pngBuf = await sharp(imgBuffer).png().toBuffer();
+                image = await pdfDoc.embedPng(pngBuf);
+            }
+            const page = pdfDoc.addPage([image.width, image.height]);
+            page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+            fs.unlinkSync(file.path);
+        }
+        const fileName = `images_${Date.now()}.pdf`;
+        const outputPath = path.join(__dirname, 'outputs', fileName);
+        ensureOutputs();
+        fs.writeFileSync(outputPath, await pdfDoc.save());
+        res.json({ downloadUrl: `/api/download/${fileName}`, pages: req.files.length });
+    } catch (e) { res.status(500).json({ error: 'Image to PDF Error' }); }
+});
+
+// Batch download as ZIP
+app.post('/api/batch/download', express.json(), async (req, res) => {
+    try {
+        const urls = req.body.urls;
+        if (!urls || !urls.length) return res.status(400).json({ error: 'No files specified' });
+        const zipFileName = `batch_${Date.now()}.zip`;
+        const zipPath = path.join(__dirname, 'outputs', zipFileName);
+        ensureOutputs();
+        const output = fs.createWriteStream(zipPath);
+        const { ZipArchive } = require('archiver');
+        const archive = new ZipArchive();
+        archive.pipe(output);
+        for (const url of urls) {
+            const name = url.split('/').pop();
+            const filePath = path.join(__dirname, 'outputs', name);
+            if (fs.existsSync(filePath)) {
+                archive.append(fs.createReadStream(filePath), { name });
+            }
+        }
+        output.on('close', () => res.json({ downloadUrl: `/api/download/${zipFileName}` }));
+        archive.finalize();
+    } catch (e) { res.status(500).json({ error: 'Batch Error' }); }
+});
+
 app.get('/api/download/:filename', (req, res) => {
     const filePath = path.join(__dirname, 'outputs', req.params.filename);
     if (fs.existsSync(filePath)) res.download(filePath, () => fs.unlinkSync(filePath));

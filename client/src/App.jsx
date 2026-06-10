@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Upload, FileSpreadsheet, Download, X, Plus, Loader2, Trash2, Share2, Type, MousePointer2,
-  FileText, Layers, Scissors, RotateCcw, Lock, Unlock, FileImage, FileDigit, Globe, 
-  Hash, Stamp, ScissorsSquare, PenTool, ShieldAlert, FileSearch, FileCheck, FileCode,
-  Combine, SplitSquareVertical, FileMinus, FileUp, Scan, Settings, LayoutGrid, FileType, Zap, CheckCircle2
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  Upload, FileSpreadsheet, Download, X, Plus, Loader2, Trash2, Share2,
+  FileText, Layers, RotateCcw, Lock, Unlock, FileImage,
+  Stamp, PenTool, ShieldAlert, FileCheck,
+  Combine, SplitSquareVertical, FileMinus, FileUp, Zap, CheckCircle2,
+  Copy, Sun, Moon, AlertCircle, Image as ImageIcon
 } from 'lucide-react';
 import axios from 'axios';
 import * as pdfjs from 'pdfjs-dist';
@@ -11,6 +12,25 @@ import * as pdfjs from 'pdfjs-dist';
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 const API_URL = window.location.origin;
+
+const formatSize = (bytes) => {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+};
+
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
+
+const Toast = ({ toasts, removeToast }) => (
+  <div className="toast-container">
+    {toasts.map(t => (
+      <div key={t.id} className={`toast ${t.type}`} onClick={() => removeToast(t.id)}>
+        {t.type === 'success' ? <CheckCircle2 size={18} /> : t.type === 'error' ? <AlertCircle size={18} /> : null}
+        {t.message}
+      </div>
+    ))}
+  </div>
+);
 
 const CompactToolCard = ({ title, desc, icon: Icon, onClick, className = "" }) => (
   <div className={`compact-tool-card ${className}`} onClick={onClick}>
@@ -23,65 +43,101 @@ const CompactToolCard = ({ title, desc, icon: Icon, onClick, className = "" }) =
 );
 
 function App() {
-  const [currentTool, setCurrentTool] = useState('home'); 
-  const [activeSegment, setActiveSegment] = useState('pdf'); 
+  const [currentTool, setCurrentTool] = useState('home');
+  const [activeSegment, setActiveSegment] = useState('pdf');
   const [files, setFiles] = useState([]);
   const [compressionLevel, setCompressionLevel] = useState('recommended');
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
-  
-  // Dynamic Tool Inputs
+
   const [password, setPassword] = useState('');
   const [watermarkText, setWatermarkText] = useState('CONFIDENTIAL');
   const [signatureText, setSignatureName] = useState('');
   const [selectedPages, setSelectedPages] = useState([]);
   const [rotation, setRotation] = useState(0);
 
-  // Editor/Viewer State
   const [modifications, setModifications] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pdfDoc, setPdfDoc] = useState(null);
   const canvasRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
+  const [toasts, setToasts] = useState([]);
+  const [dragging, setDragging] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const addToast = useCallback((message, type = 'info') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+  }, []);
+
+  const removeToast = useCallback((id) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
 
   const onFileChange = (e) => {
-    const selectedFiles = Array.from(e.target.files);
-    setFiles((prev) => [...prev, ...selectedFiles]);
+    const selected = Array.from(e.target.files).filter(f => f.size <= MAX_FILE_SIZE);
+    if (selected.length !== e.target.files.length) addToast('Some files exceed 50MB limit', 'error');
+    setFiles(prev => [...prev, ...selected]);
     setError(null);
     setResult(null);
   };
 
   const removeFile = (index) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
+    setFiles(prev => prev.filter((_, i) => i !== index));
     if (files.length <= 1) setResult(null);
   };
 
+  const handleDragOver = (e) => { e.preventDefault(); setDragging(true); };
+  const handleDragLeave = () => setDragging(false);
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragging(false);
+    const dropped = Array.from(e.dataTransfer.files).filter(f => f.size <= MAX_FILE_SIZE);
+    setFiles(prev => [...prev, ...dropped]);
+  };
+
   useEffect(() => {
-    const needsViewer = ['pdf-edit', 'pdf-rotate', 'pdf-remove', 'pdf-extract', 'pdf-watermark', 'pdf-numbers', 'pdf-sign'].includes(currentTool);
+    const needsViewer = ['pdf-edit', 'pdf-rotate', 'pdf-remove', 'pdf-extract', 'pdf-watermark', 'pdf-sign'].includes(currentTool);
     if (needsViewer && files.length > 0) {
       const file = files[0];
       const reader = new FileReader();
       reader.onload = async (e) => {
-        const typedarray = new Uint8Array(e.target.result);
-        const loadingTask = pdfjs.getDocument(typedarray);
-        const pdf = await loadingTask.promise;
-        setPdfDoc(pdf);
-        renderPage(pdf, 1);
+        try {
+          const typedarray = new Uint8Array(e.target.result);
+          const loadingTask = pdfjs.getDocument(typedarray);
+          const pdf = await loadingTask.promise;
+          setPdfDoc(pdf);
+          setCurrentPage(1);
+          renderPage(pdf, 1);
+        } catch { addToast('Could not load PDF preview', 'error'); }
       };
       reader.readAsArrayBuffer(file);
+    } else {
+      setPdfDoc(null);
     }
   }, [currentTool, files]);
 
   const renderPage = async (pdf, pageNum) => {
     if (!pdf) return;
-    const page = await pdf.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 1.0 });
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const context = canvas.getContext('2d');
-    canvas.height = viewport.height;
-    canvas.width = viewport.width;
-    await page.render({ canvasContext: context, viewport: viewport }).promise;
+    try {
+      const page = await pdf.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 1.0 });
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const context = canvas.getContext('2d');
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+      await page.render({ canvasContext: context, viewport: viewport }).promise;
+    } catch { /* ignore render errors */ }
   };
 
   const handleCanvasClick = (e) => {
@@ -102,8 +158,6 @@ function App() {
 
     const formData = new FormData();
     files.forEach((file) => formData.append('files', file));
-    
-    // Add specific tool parameters
     formData.append('level', compressionLevel);
     formData.append('password', password);
     formData.append('watermark', watermarkText);
@@ -122,63 +176,87 @@ function App() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setResult(response.data);
+      addToast('File processed successfully!', 'success');
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to process files.');
+      const msg = err.response?.data?.error || 'Failed to process files.';
+      setError(msg);
+      addToast(msg, 'error');
     } finally {
       setIsProcessing(false);
     }
   };
 
   const reset = () => {
-    setFiles([]); setResult(null); setError(null); setModifications([]); setRotation(0);
-    setPdfDoc(null); setPassword(''); setSignatureName(''); setSelectedPages([]);
-    setCurrentTool('home');
+    setFiles([]); setResult(null); setError(null); setModifications([]);
+    setRotation(0); setPdfDoc(null); setPassword(''); setSignatureName('');
+    setSelectedPages([]); setCurrentTool('home'); setCurrentPage(1);
+  };
+
+  const copyDownloadLink = () => {
+    if (result?.downloadUrl) {
+      navigator.clipboard.writeText(`${API_URL}${result.downloadUrl}`);
+      setCopied(true);
+      addToast('Link copied to clipboard!', 'success');
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const getAccept = () => {
+    if (currentTool === 'pdf-images') return '.png,.jpg,.jpeg,.webp';
+    if (currentTool.includes('to-pdf') || currentTool === 'excel-merge') return '.xlsx,.csv';
+    if (currentTool.startsWith('pdf-') || currentTool === 'pdf-to-excel') return '.pdf';
+    return activeSegment === 'pdf' ? '.pdf' : '.xlsx,.csv';
   };
 
   const renderDashboard = () => (
     <div className="dashboard-container">
       <div className="segment-tabs">
-        <div className={`segment-tab ${activeSegment === 'pdf' ? 'active' : ''}`} onClick={() => setActiveSegment('pdf')}>PDF Suite</div>
-        <div className={`segment-tab excel ${activeSegment === 'excel' ? 'active' : ''}`} onClick={() => setActiveSegment('excel')}>Excel Suite</div>
+        <div className={`segment-tab ${activeSegment === 'pdf' ? 'active' : ''}`} onClick={() => setActiveSegment('pdf')}>
+          <Layers size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} /> PDF Suite
+        </div>
+        <div className={`segment-tab excel ${activeSegment === 'excel' ? 'active' : ''}`} onClick={() => setActiveSegment('excel')}>
+          <FileSpreadsheet size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} /> Excel Suite
+        </div>
       </div>
 
       {activeSegment === 'pdf' ? (
         <div className="category-container">
           <div className="category-box">
-            <div className="category-title"><Layers size={16} /> Organize</div>
+            <div className="category-title"><Layers size={14} /> Organize</div>
             <div className="compact-grid">
-              <CompactToolCard title="Merge PDF" desc="Combine multiple PDFs." icon={Combine} onClick={() => setCurrentTool('pdf-merge')} />
-              <CompactToolCard title="Split PDF" desc="Extract pages from PDF." icon={SplitSquareVertical} onClick={() => setCurrentTool('pdf-split')} />
-              <CompactToolCard title="Remove pages" desc="Delete specific pages." icon={FileMinus} onClick={() => setCurrentTool('pdf-remove')} />
-              <CompactToolCard title="Extract pages" desc="Save specific pages." icon={FileUp} onClick={() => setCurrentTool('pdf-extract')} />
+              <CompactToolCard title="Merge PDF" desc="Combine multiple PDFs" icon={Combine} onClick={() => setCurrentTool('pdf-merge')} />
+              <CompactToolCard title="Split PDF" desc="Extract pages from PDF" icon={SplitSquareVertical} onClick={() => setCurrentTool('pdf-split')} />
+              <CompactToolCard title="Remove Pages" desc="Delete specific pages" icon={FileMinus} onClick={() => setCurrentTool('pdf-remove')} />
+              <CompactToolCard title="Extract Pages" desc="Save specific pages" icon={FileUp} onClick={() => setCurrentTool('pdf-extract')} />
             </div>
           </div>
           <div className="category-box">
-            <div className="category-title"><Zap size={16} /> Optimize & Edit</div>
+            <div className="category-title"><Zap size={14} /> Optimize & Edit</div>
             <div className="compact-grid">
-              <CompactToolCard title="Compress PDF" desc="Reduce file size." icon={Zap} onClick={() => setCurrentTool('pdf-compress')} />
-              <CompactToolCard title="Edit PDF" desc="Add text and images." icon={PenTool} onClick={() => setCurrentTool('pdf-edit')} />
-              <CompactToolCard title="Rotate PDF" desc="Rotate PDF pages." icon={RotateCcw} onClick={() => setCurrentTool('pdf-rotate')} />
-              <CompactToolCard title="Watermark" desc="Add text/image stamp." icon={Stamp} onClick={() => setCurrentTool('pdf-watermark')} />
+              <CompactToolCard title="Compress PDF" desc="Reduce file size" icon={Zap} onClick={() => setCurrentTool('pdf-compress')} />
+              <CompactToolCard title="Edit PDF" desc="Add text and images" icon={PenTool} onClick={() => setCurrentTool('pdf-edit')} />
+              <CompactToolCard title="Rotate PDF" desc="Rotate PDF pages" icon={RotateCcw} onClick={() => setCurrentTool('pdf-rotate')} />
+              <CompactToolCard title="Watermark" desc="Add text stamp" icon={Stamp} onClick={() => setCurrentTool('pdf-watermark')} />
             </div>
           </div>
           <div className="category-box">
-            <div className="category-title"><Lock size={16} /> Security</div>
+            <div className="category-title"><Lock size={14} /> Security & Convert</div>
             <div className="compact-grid">
-              <CompactToolCard title="Protect PDF" desc="Add password security." icon={Lock} onClick={() => setCurrentTool('pdf-protect')} />
-              <CompactToolCard title="Unlock PDF" desc="Remove password." icon={Unlock} onClick={() => setCurrentTool('pdf-unlock')} />
-              <CompactToolCard title="Sign PDF" desc="Sign your documents." icon={FileCheck} onClick={() => setCurrentTool('pdf-sign')} />
+              <CompactToolCard title="Protect PDF" desc="Add password" icon={Lock} onClick={() => setCurrentTool('pdf-protect')} />
+              <CompactToolCard title="Unlock PDF" desc="Remove password" icon={Unlock} onClick={() => setCurrentTool('pdf-unlock')} />
+              <CompactToolCard title="Sign PDF" desc="Sign documents" icon={FileCheck} onClick={() => setCurrentTool('pdf-sign')} />
+              <CompactToolCard title="Image to PDF" desc="Convert images to PDF" icon={ImageIcon} onClick={() => setCurrentTool('pdf-images')} />
             </div>
           </div>
         </div>
       ) : (
         <div className="category-container">
           <div className="category-box">
-            <div className="category-title"><FileSpreadsheet size={16} /> Data Tools</div>
+            <div className="category-title"><FileSpreadsheet size={14} /> Data Tools</div>
             <div className="compact-grid">
-              <CompactToolCard className="excel" title="Merge Excel" desc="Combine multiple XLSX/CSV." icon={Combine} onClick={() => setCurrentTool('excel-merge')} />
-              <CompactToolCard className="excel" title="Excel to PDF" desc="Convert spreadsheets to PDF." icon={FileText} onClick={() => setCurrentTool('excel-to-pdf')} />
-              <CompactToolCard className="excel" title="PDF to Excel" desc="Extract tables to XLSX." icon={FileSpreadsheet} onClick={() => setCurrentTool('pdf-to-excel')} />
+              <CompactToolCard className="excel" title="Merge Excel" desc="Combine XLSX/CSV files" icon={Combine} onClick={() => setCurrentTool('excel-merge')} />
+              <CompactToolCard className="excel" title="Excel to PDF" desc="Convert to PDF" icon={FileText} onClick={() => setCurrentTool('excel-to-pdf')} />
+              <CompactToolCard className="excel" title="PDF to Excel" desc="Extract data to XLSX" icon={FileSpreadsheet} onClick={() => setCurrentTool('pdf-to-excel')} />
             </div>
           </div>
         </div>
@@ -186,146 +264,198 @@ function App() {
     </div>
   );
 
+  const renderFileCard = (file, idx) => (
+    <div key={idx} className={`file-card ${activeSegment === 'excel' ? 'excel' : ''} ${currentTool === 'pdf-images' ? 'image' : ''}`}>
+      <div className="remove-btn" onClick={() => removeFile(idx)}><X size={14} /></div>
+      <div className="file-icon">
+        {currentTool === 'pdf-images' ? <ImageIcon size={36} /> :
+         activeSegment === 'excel' ? <FileSpreadsheet size={36} /> : <FileText size={36} />}
+      </div>
+      <div className="file-name" title={file.name}>{file.name}</div>
+      <div className="file-size">{formatSize(file.size)}</div>
+    </div>
+  );
+
+  const renderToolbar = () => (
+    <div className="toolbar">
+      <h2>{currentTool.replace(/-/g, ' ')}</h2>
+      <button className="btn" onClick={reset}>Cancel</button>
+    </div>
+  );
+
+  const renderSidebar = () => (
+    <aside className="sidebar">
+      <h2>Options</h2>
+
+      {currentTool === 'pdf-protect' && (
+        <div className="input-group">
+          <label>Set Password</label>
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter strong password" />
+        </div>
+      )}
+
+      {currentTool === 'pdf-unlock' && (
+        <div className="input-group">
+          <label>PDF Password</label>
+          <input type="text" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter existing password" />
+        </div>
+      )}
+
+      {currentTool === 'pdf-watermark' && (
+        <div className="input-group">
+          <label>Watermark Text</label>
+          <input type="text" value={watermarkText} onChange={(e) => setWatermarkText(e.target.value)} />
+        </div>
+      )}
+
+      {currentTool === 'pdf-sign' && (
+        <div className="input-group">
+          <label>Signature Text</label>
+          <input type="text" value={signatureText} onChange={(e) => setSignatureName(e.target.value)} placeholder="Type your name" />
+        </div>
+      )}
+
+      {currentTool === 'pdf-rotate' && (
+        <button className="btn" style={{ width: '100%', marginBottom: '1rem' }} onClick={() => setRotation((rotation + 90) % 360)}>
+          Rotate Right 90°
+        </button>
+      )}
+
+      {currentTool === 'excel-merge' && (
+        <div className="input-group">
+          <label>Compression</label>
+          <select value={compressionLevel} onChange={(e) => setCompressionLevel(e.target.value)}>
+            <option value="low">Low</option>
+            <option value="recommended">Recommended</option>
+            <option value="extreme">Extreme (dedup)</option>
+          </select>
+        </div>
+      )}
+
+      <button className="action-btn" onClick={handleProcess} disabled={isProcessing || files.length === 0}>
+        {isProcessing ? 'Processing...' : 'Proceed'}
+      </button>
+
+      {isProcessing && <div className="progress-bar"><div className="progress-bar-fill" /></div>}
+      {error && <div className="error-msg">{error}</div>}
+    </aside>
+  );
+
   return (
     <div className="app-wrapper">
+      <Toast toasts={toasts} removeToast={removeToast} />
+
       <header className="premium-header">
-        <div className="logo" onClick={reset} style={{cursor: 'pointer'}}><FileSpreadsheet size={24} /> DocuMax Pro</div>
-        <div style={{fontSize: '0.8rem', color: '#999', fontWeight: '500', marginLeft: '1rem', flex: 1}}>Created by <span style={{color: '#666', fontWeight: '700'}}>Diwakar Singh</span></div>
-        <nav className="main-nav">
-          <div className={`nav-link ${currentTool === 'home' ? 'active' : ''}`} onClick={reset}>Home</div>
-          <div className={`nav-link ${activeSegment === 'pdf' && currentTool === 'home' ? 'active' : ''}`} onClick={() => {reset(); setActiveSegment('pdf');}}>PDF Tools</div>
-          <div className={`nav-link ${activeSegment === 'excel' && currentTool === 'home' ? 'active' : ''}`} onClick={() => {reset(); setActiveSegment('excel');}}>Excel Tools</div>
-        </nav>
+        <div className="logo" onClick={reset}>
+          <FileSpreadsheet size={24} /> <span>DocuMax Pro</span>
+        </div>
+        <div className="header-right">
+          <span className="creator-badge">by <strong>Diwakar Singh</strong></span>
+          <nav className="main-nav">
+            <div className={`nav-link ${currentTool === 'home' ? 'active' : ''}`} onClick={reset}>Home</div>
+            <div className={`nav-link ${activeSegment === 'pdf' && currentTool === 'home' ? 'active' : ''}`}
+              onClick={() => { reset(); setActiveSegment('pdf'); }}>PDF</div>
+            <div className={`nav-link ${activeSegment === 'excel' && currentTool === 'home' ? 'active' : ''}`}
+              onClick={() => { reset(); setActiveSegment('excel'); }}>Excel</div>
+          </nav>
+          <button className="theme-toggle" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
+            {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+          </button>
+        </div>
       </header>
 
-      <main style={{flex: 1, background: 'var(--bg-light)', overflowY: 'auto'}}>
+      <main style={{ flex: 1, background: 'var(--bg-light)', overflowY: 'auto' }}>
         {currentTool === 'home' ? (
           <div className="hero">
             <h1>Unified File Management</h1>
-            <p>Professional PDF and Excel tools in one place.</p>
+            <p>Professional PDF, Image & Excel tools in one place</p>
             {renderDashboard()}
-            <footer style={{marginTop: '4rem', padding: '3rem 2rem', color: '#999', fontSize: '0.85rem', borderTop: '1px solid #eee', background: 'white'}}>
-              <div style={{maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                <div>&copy; 2026 <strong>DocuMax Pro Suite</strong>. All rights reserved.</div>
-                <div>Designed & Engineered by <span style={{color: '#555', fontWeight: '800'}}>Diwakar Singh</span></div>
-              </div>
-            </footer>
+            <div className="site-footer">
+              &copy; 2026 <strong>DocuMax Pro Suite</strong>. Designed by <strong>Diwakar Singh</strong>
+            </div>
           </div>
         ) : result ? (
-          <div className="workspace" style={{justifyContent: 'center'}}>
-            <div className="main-content success-view" style={{maxWidth: '800px', alignItems: 'center', textAlign: 'center'}}>
-              <CheckCircle2 size={64} color="#198754" style={{marginBottom: '1rem'}} />
+          <div className="workspace" style={{ justifyContent: 'center' }}>
+            <div className="main-content success-view">
+              <CheckCircle2 size={64} color="#198754" />
               <h2>Success! Your file is ready.</h2>
-              <a href={`${API_URL}${result.downloadUrl}`} className="download-link" style={{margin: '2rem 0'}}>Download Now <Download /></a>
+              <a href={`${API_URL}${result.downloadUrl}`} className="download-link" download>
+                Download Now <Download size={20} />
+              </a>
+              <button className="copy-link-btn" onClick={copyDownloadLink}>
+                <Copy size={16} /> {copied ? 'Copied!' : 'Copy Download Link'}
+              </button>
               <button className="btn" onClick={reset}>Back to Home</button>
             </div>
           </div>
         ) : (
           <div className="workspace">
             <div className="main-content">
-              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem'}}>
-                <h2 style={{margin: 0, fontSize: '1.8rem', fontWeight: 900, textTransform: 'uppercase'}}>{currentTool.replace(/-/g, ' ')}</h2>
-                <button className="btn" onClick={reset}>Cancel</button>
-              </div>
+              {renderToolbar()}
 
               {files.length === 0 ? (
-                <div className="hero" style={{padding: '4rem 0'}}>
-                  <div className="select-btn" onClick={() => document.getElementById('fileInput').click()}>Select File</div>
-                  <input id="fileInput" type="file" multiple hidden accept={
-                    currentTool.includes('to-pdf') || currentTool === 'excel-merge' ? '.xlsx,.csv' :
-                    currentTool.startsWith('pdf-') || currentTool === 'pdf-to-excel' ? '.pdf' :
-                    activeSegment === 'pdf' ? '.pdf' : '.xlsx,.csv'
-                  } onChange={onFileChange} />
-                  <p style={{marginTop: '1.5rem', color: '#888'}}>Private & Secure processing</p>
+                <div
+                  className={`select-area ${dragging ? 'dragging' : ''}`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    hidden
+                    accept={getAccept()}
+                    onChange={onFileChange}
+                  />
+                  <div className="select-btn">Select File</div>
+                  <div className="select-hint">or drag & drop files here</div>
+                  <div className="select-hint" style={{ marginTop: '0.3rem', fontSize: '0.75rem' }}>
+                    Max 50MB per file &bull; Private & secure processing
+                  </div>
                 </div>
               ) : (
-                <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem'}}>
-                   {['pdf-edit', 'pdf-rotate', 'pdf-remove', 'pdf-extract', 'pdf-watermark', 'pdf-sign'].includes(currentTool) && (
-                      <div style={{background: 'white', padding: '0.75rem 1.5rem', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', display: 'flex', gap: '15px', alignItems: 'center', border: '1px solid #f0f0f0'}}>
-                        <button className="btn" onClick={() => { if(currentPage > 1) { setCurrentPage(currentPage-1); renderPage(pdfDoc, currentPage-1); }}}>Prev</button>
-                        <span style={{fontWeight: '700'}}>Page {currentPage} of {pdfDoc?.numPages || '?'}</span>
-                        <button className="btn" onClick={() => { if(currentPage < pdfDoc?.numPages) { setCurrentPage(currentPage+1); renderPage(pdfDoc, currentPage+1); }}}>Next</button>
-                        
-                        {currentTool === 'pdf-remove' || currentTool === 'pdf-extract' ? (
-                          <label style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginLeft: '10px'}}>
-                            <input type="checkbox" checked={selectedPages.includes(currentPage-1)} onChange={(e) => {
-                              if(e.target.checked) setSelectedPages([...selectedPages, currentPage-1]);
-                              else setSelectedPages(selectedPages.filter(p => p !== currentPage-1));
-                            }} /> <strong>Select Page</strong>
-                          </label>
-                        ) : null}
-                      </div>
-                   )}
-                   
-                   <div style={{position: 'relative', boxShadow: '0 20px 60px rgba(0,0,0,0.12)', transform: `rotate(${rotation}deg)`, transition: 'transform 0.3s', borderRadius: '4px', overflow: 'hidden'}}>
-                      <canvas ref={canvasRef} onClick={handleCanvasClick} style={{cursor: currentTool === 'pdf-edit' ? 'crosshair' : 'default', display: pdfDoc ? 'block' : 'none'}}></canvas>
-                      {!pdfDoc && (
-                        <div className="file-grid">
-                          {files.map((file, idx) => (
-                            <div key={idx} className={`file-card ${activeSegment === 'excel' ? 'excel' : ''}`}>
-                              <div className="remove-btn" onClick={() => removeFile(idx)}><X size={16} /></div>
-                              <div className="icon-container">{activeSegment === 'pdf' ? <Upload size={72} /> : <FileSpreadsheet size={72} />}</div>
-                              <div className="file-name">{file.name}</div>
-                            </div>
-                          ))}
-                        </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.2rem' }}>
+                  {['pdf-edit', 'pdf-rotate', 'pdf-remove', 'pdf-extract', 'pdf-watermark', 'pdf-sign'].includes(currentTool) && (
+                    <div className="pdf-controls">
+                      <button className="btn" onClick={() => { if (currentPage > 1) { const p = currentPage - 1; setCurrentPage(p); renderPage(pdfDoc, p); }}} disabled={currentPage <= 1}>Prev</button>
+                      <span>Page {currentPage} of {pdfDoc?.numPages || '?'}</span>
+                      <button className="btn" onClick={() => { if (currentPage < pdfDoc?.numPages) { const p = currentPage + 1; setCurrentPage(p); renderPage(pdfDoc, p); }}} disabled={currentPage >= (pdfDoc?.numPages || 0)}>Next</button>
+
+                      {(currentTool === 'pdf-remove' || currentTool === 'pdf-extract') && (
+                        <label>
+                          <input type="checkbox" checked={selectedPages.includes(currentPage - 1)}
+                            onChange={(e) => {
+                              if (e.target.checked) setSelectedPages([...selectedPages, currentPage - 1]);
+                              else setSelectedPages(selectedPages.filter(p => p !== currentPage - 1));
+                            }} />
+                          <strong>Select</strong>
+                        </label>
                       )}
-                      {currentTool === 'pdf-edit' && modifications.filter(m => m.pageIndex === currentPage - 1).map((m, i) => (
-                        <div key={i} style={{ position: 'absolute', left: m.x, top: (canvasRef.current?.height || 0) - m.y, background: 'rgba(255,255,0,0.4)', padding: '2px 4px', fontWeight: '600' }}>{m.text}</div>
-                      ))}
-                   </div>
+                    </div>
+                  )}
+
+                  <div className="file-grid">
+                    {files.map((file, idx) => renderFileCard(file, idx))}
+                    <div className="file-card add-more-card" onClick={() => fileInputRef.current?.click()}>
+                      <input type="file" multiple hidden accept={getAccept()} onChange={onFileChange} />
+                      <Plus size={32} />
+                      <div style={{ fontSize: '0.7rem', marginTop: '0.5rem' }}>Add More</div>
+                    </div>
+                  </div>
+
+                  {['pdf-edit', 'pdf-rotate', 'pdf-remove', 'pdf-extract', 'pdf-watermark', 'pdf-sign'].includes(currentTool) && (
+                    <div style={{ position: 'relative', boxShadow: '0 20px 60px rgba(0,0,0,0.12)', transform: `rotate(${rotation}deg)`, transition: 'transform 0.3s', borderRadius: '4px', overflow: 'hidden', maxWidth: '100%' }}>
+                      <canvas ref={canvasRef} onClick={handleCanvasClick}
+                        style={{ cursor: currentTool === 'pdf-edit' ? 'crosshair' : 'default', display: pdfDoc ? 'block' : 'none', maxWidth: '100%', height: 'auto' }} />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
-            {files.length > 0 && (
-              <aside className="sidebar">
-                <h2>Options</h2>
-                
-                {currentTool === 'pdf-protect' && (
-                  <div className="input-group" style={{marginBottom: '1.5rem'}}>
-                    <label style={{display: 'block', marginBottom: '8px', fontWeight: '700', fontSize: '0.8rem'}}>SET PASSWORD</label>
-                    <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter strong password" style={{width: '100%', padding: '0.8rem', borderRadius: '8px', border: '2px solid #eee'}} />
-                  </div>
-                )}
-
-                {currentTool === 'pdf-unlock' && (
-                  <div className="input-group" style={{marginBottom: '1.5rem'}}>
-                    <label style={{display: 'block', marginBottom: '8px', fontWeight: '700', fontSize: '0.8rem'}}>PDF PASSWORD</label>
-                    <input type="text" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter existing password" style={{width: '100%', padding: '0.8rem', borderRadius: '8px', border: '2px solid #eee'}} />
-                  </div>
-                )}
-
-                {currentTool === 'pdf-watermark' && (
-                  <div className="input-group" style={{marginBottom: '1.5rem'}}>
-                    <label style={{display: 'block', marginBottom: '8px', fontWeight: '700', fontSize: '0.8rem'}}>WATERMARK TEXT</label>
-                    <input type="text" value={watermarkText} onChange={(e) => setWatermarkText(e.target.value)} style={{width: '100%', padding: '0.8rem', borderRadius: '8px', border: '2px solid #eee'}} />
-                  </div>
-                )}
-
-                {currentTool === 'pdf-sign' && (
-                  <div className="input-group" style={{marginBottom: '1.5rem'}}>
-                    <label style={{display: 'block', marginBottom: '8px', fontWeight: '700', fontSize: '0.8rem'}}>SIGNATURE TEXT</label>
-                    <input type="text" value={signatureText} onChange={(e) => setSignatureName(e.target.value)} placeholder="Type your name" style={{width: '100%', padding: '0.8rem', borderRadius: '8px', border: '2px solid #eee'}} />
-                  </div>
-                )}
-
-                {currentTool === 'pdf-rotate' && (
-                  <button className="btn" style={{width: '100%', marginBottom: '1rem'}} onClick={() => setRotation((rotation + 90) % 360)}>Rotate Right (90°)</button>
-                )}
-
-                {currentTool === 'excel-merge' && (
-                   <select style={{width: '100%', padding: '0.8rem', borderRadius: '8px', border: '2px solid #eee', marginBottom: '1.5rem'}} value={compressionLevel} onChange={(e) => setCompressionLevel(e.target.value)}>
-                      <option value="low">Low Compression</option>
-                      <option value="recommended">Recommended</option>
-                      <option value="extreme">Extreme</option>
-                   </select>
-                )}
-
-                <button className="action-btn" onClick={handleProcess} disabled={isProcessing}>{isProcessing ? 'PROCESSING...' : 'PROCEED'}</button>
-                {error && <div className="error-msg" style={{marginTop: '1rem'}}>{error}</div>}
-              </aside>
-            )}
+            {files.length > 0 && renderSidebar()}
           </div>
         )}
       </main>
