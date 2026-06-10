@@ -204,8 +204,75 @@ body { margin: 0; min-height: 100vh; }
 .hero h1 { font-size: 2.2rem; font-weight: 900; margin: 0 0 0.5rem 0; }
 .hero p { font-size: 1.1rem; color: #666; margin: 0; }
 
-.loading-overlay {
-  position: fixed; top: 0; left: 0; right: 0; bottom: 0; 
-  background: rgba(255,255,255,0.9); display: flex; 
-  flex-direction: column; alignItems: center; justifyContent: center; z-index: 1000;
+/* Buttons */
+.btn {
+  padding: 0.6rem 1.2rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+
+.btn:hover {
+  background: var(--bg-light);
+  border-color: #ccc;
+}
+
+.select-btn {
+  padding: 1.2rem 3rem;
+  background: var(--primary);
+  color: white;
+  font-size: 1.5rem;
+  font-weight: 800;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(229, 50, 45, 0.2);
+  transition: all 0.2s;
+  display: inline-block;
+  margin-top: 1.5rem;
+}
+
+.select-btn:hover {
+  transform: translateY(-2px);
+  background: var(--primary-dark);
+  box-shadow: 0 6px 16px rgba(229, 50, 45, 0.3);
+}
+
+.action-btn {
+  width: 100%;
+  padding: 1rem;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: auto;
+  transition: background 0.2s;
+}
+
+.action-btn:hover:not(:disabled) {
+  background: var(--primary-dark);
+}
+
+.action-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.download-link {
+  background: var(--primary);
+  color: white;
+  padding: 1.2rem 2.5rem;
+  border-radius: 8px;
+  font-size: 1.3rem;
+  font-weight: 800;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
 }
