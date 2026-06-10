@@ -13,16 +13,19 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/$
 
 const API_URL = window.location.origin;
 
-const ToolCard = ({ title, desc, icon: Icon, onClick, className = "" }) => (
-  <div className={`tool-card ${className}`} onClick={onClick}>
-    <div className="icon-wrapper"><Icon size={32} /></div>
-    <h3>{title}</h3>
-    <p>{desc}</p>
+const CompactToolCard = ({ title, desc, icon: Icon, onClick, className = "" }) => (
+  <div className={`compact-tool-card ${className}`} onClick={onClick}>
+    <div className="tool-icon"><Icon size={20} /></div>
+    <div className="tool-info">
+      <h3>{title}</h3>
+      <p>{desc}</p>
+    </div>
   </div>
 );
 
 function App() {
   const [currentTool, setCurrentTool] = useState('home'); 
+  const [activeSegment, setActiveSegment] = useState('pdf'); // pdf or excel
   const [files, setFiles] = useState([]);
   const [compressionLevel, setCompressionLevel] = useState('recommended');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -62,7 +65,7 @@ function App() {
   const renderPage = async (pdf, pageNum) => {
     if (!pdf) return;
     const page = await pdf.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 1.2 });
+    const viewport = page.getViewport({ scale: 1.0 });
     const canvas = canvasRef.current;
     if (!canvas) return;
     const context = canvas.getContext('2d');
@@ -87,8 +90,8 @@ function App() {
       setModifications([...modifications, {
         type: 'text',
         text,
-        x: x / 1.2,
-        y: (canvasRef.current.height - y) / 1.2,
+        x: x,
+        y: (canvasRef.current.height - y),
         pageIndex: currentPage - 1
       }]);
     }
@@ -139,94 +142,64 @@ function App() {
 
   const renderDashboard = () => (
     <div className="dashboard-container">
-      <div className="dashboard-section">
-        <div className="section-header">
-          <Layers size={24} color="#e5322d" />
-          <h2>Organize PDF</h2>
+      <div className="segment-tabs">
+        <div 
+          className={`segment-tab ${activeSegment === 'pdf' ? 'active' : ''}`}
+          onClick={() => setActiveSegment('pdf')}
+        >
+          PDF Suite
         </div>
-        <div className="tool-grid">
-          <ToolCard title="Merge PDF" desc="Combine PDFs in the order you want." icon={Combine} onClick={() => setCurrentTool('pdf-merge')} />
-          <ToolCard title="Split PDF" desc="Separate one page or a whole set." icon={SplitSquareVertical} onClick={() => setCurrentTool('pdf-split')} />
-          <ToolCard title="Remove pages" desc="Delete pages from a PDF file." icon={FileMinus} onClick={() => setCurrentTool('pdf-remove')} />
-          <ToolCard title="Extract pages" desc="Get specific pages as a new PDF." icon={FileUp} onClick={() => setCurrentTool('pdf-extract')} />
-          <ToolCard title="Organize PDF" desc="Sort, add and delete PDF pages." icon={LayoutGrid} onClick={() => setCurrentTool('pdf-organize')} />
-          <ToolCard title="Scan to PDF" desc="Convert scanned images to PDF." icon={Scan} onClick={() => setCurrentTool('pdf-scan')} />
-        </div>
-      </div>
-
-      <div className="dashboard-section">
-        <div className="section-header">
-          <Zap size={24} color="#e5322d" />
-          <h2>Optimize PDF</h2>
-        </div>
-        <div className="tool-grid">
-          <ToolCard title="Compress PDF" desc="Reduce file size while optimizing quality." icon={Zap} onClick={() => setCurrentTool('pdf-compress')} />
-          <ToolCard title="Repair PDF" desc="Recover data from a damaged PDF." icon={Settings} onClick={() => setCurrentTool('pdf-repair')} />
-          <ToolCard title="OCR PDF" desc="Make scanned PDFs searchable." icon={FileSearch} onClick={() => setCurrentTool('pdf-ocr')} />
+        <div 
+          className={`segment-tab excel ${activeSegment === 'excel' ? 'active' : ''}`}
+          onClick={() => setActiveSegment('excel')}
+        >
+          Excel Suite
         </div>
       </div>
 
-      <div className="dashboard-section">
-        <div className="section-header">
-          <Plus size={24} color="#e5322d" />
-          <h2>Convert to PDF</h2>
-        </div>
-        <div className="tool-grid">
-          <ToolCard title="JPG to PDF" desc="Convert JPG, PNG, BMP images to PDF." icon={FileImage} onClick={() => setCurrentTool('jpg-to-pdf')} />
-          <ToolCard title="WORD to PDF" desc="Convert DOCX to PDF." icon={FileText} onClick={() => setCurrentTool('word-to-pdf')} />
-          <ToolCard title="POWERPOINT to PDF" desc="Convert PPTX to PDF." icon={FileType} onClick={() => setCurrentTool('ppt-to-pdf')} />
-          <ToolCard title="EXCEL to PDF" desc="Convert XLSX to PDF." icon={FileSpreadsheet} onClick={() => setCurrentTool('excel-to-pdf')} />
-          <ToolCard title="HTML to PDF" desc="Convert webpages to PDF." icon={Globe} onClick={() => setCurrentTool('html-to-pdf')} />
-        </div>
-      </div>
+      {activeSegment === 'pdf' ? (
+        <div className="category-container">
+          <div className="category-box">
+            <div className="category-title"><Layers size={16} /> Organize</div>
+            <div className="compact-grid">
+              <CompactToolCard title="Merge PDF" desc="Combine multiple PDFs." icon={Combine} onClick={() => setCurrentTool('pdf-merge')} />
+              <CompactToolCard title="Split PDF" desc="Extract pages from PDF." icon={SplitSquareVertical} onClick={() => setCurrentTool('pdf-split')} />
+              <CompactToolCard title="Remove pages" desc="Delete specific pages." icon={FileMinus} onClick={() => setCurrentTool('pdf-remove')} />
+              <CompactToolCard title="Extract pages" desc="Save specific pages." icon={FileUp} onClick={() => setCurrentTool('pdf-extract')} />
+            </div>
+          </div>
 
-      <div className="dashboard-section">
-        <div className="section-header">
-          <Download size={24} color="#e5322d" />
-          <h2>Convert from PDF</h2>
-        </div>
-        <div className="tool-grid">
-          <ToolCard title="PDF to JPG" desc="Extract images or save pages as JPG." icon={FileImage} onClick={() => setCurrentTool('pdf-to-jpg')} />
-          <ToolCard title="PDF to WORD" desc="Convert PDF to editable DOCX." icon={FileText} onClick={() => setCurrentTool('pdf-to-word')} />
-          <ToolCard title="PDF to POWERPOINT" desc="Convert PDF to PPTX." icon={FileType} onClick={() => setCurrentTool('pdf-to-ppt')} />
-          <ToolCard title="PDF to EXCEL" desc="Convert PDF to XLSX spreadsheets." icon={FileSpreadsheet} onClick={() => setCurrentTool('pdf-to-excel')} />
-        </div>
-      </div>
+          <div className="category-box">
+            <div className="category-title"><Zap size={16} /> Optimize & Edit</div>
+            <div className="compact-grid">
+              <CompactToolCard title="Compress PDF" desc="Reduce file size." icon={Zap} onClick={() => setCurrentTool('pdf-compress')} />
+              <CompactToolCard title="Edit PDF" desc="Add text and images." icon={PenTool} onClick={() => setCurrentTool('pdf-edit')} />
+              <CompactToolCard title="Rotate PDF" desc="Rotate PDF pages." icon={RotateCcw} onClick={() => setCurrentTool('pdf-rotate')} />
+              <CompactToolCard title="Watermark" desc="Add text/image stamp." icon={Stamp} onClick={() => setCurrentTool('pdf-watermark')} />
+            </div>
+          </div>
 
-      <div className="dashboard-section">
-        <div className="section-header">
-          <PenTool size={24} color="#e5322d" />
-          <h2>Edit PDF</h2>
+          <div className="category-box">
+            <div className="category-title"><Lock size={16} /> Security</div>
+            <div className="compact-grid">
+              <CompactToolCard title="Protect PDF" desc="Add password security." icon={Lock} onClick={() => setCurrentTool('pdf-protect')} />
+              <CompactToolCard title="Unlock PDF" desc="Remove password." icon={Unlock} onClick={() => setCurrentTool('pdf-unlock')} />
+              <CompactToolCard title="Sign PDF" desc="Sign your documents." icon={FileCheck} onClick={() => setCurrentTool('pdf-sign')} />
+            </div>
+          </div>
         </div>
-        <div className="tool-grid">
-          <ToolCard title="Edit PDF" desc="Add text, images, shapes and more." icon={PenTool} onClick={() => setCurrentTool('pdf-edit')} />
-          <ToolCard title="Rotate PDF" desc="Rotate your PDF pages." icon={RotateCcw} onClick={() => setCurrentTool('pdf-rotate')} />
-          <ToolCard title="Page Numbers" desc="Add page numbers to PDF easily." icon={Hash} onClick={() => setCurrentTool('pdf-numbers')} />
-          <ToolCard title="Add Watermark" desc="Stamp an image or text over your PDF." icon={Stamp} onClick={() => setCurrentTool('pdf-watermark')} />
+      ) : (
+        <div className="category-container">
+          <div className="category-box">
+            <div className="category-title"><FileSpreadsheet size={16} /> Data Tools</div>
+            <div className="compact-grid">
+              <CompactToolCard className="excel" title="Merge Excel" desc="Combine multiple XLSX/CSV." icon={Combine} onClick={() => setCurrentTool('excel-merge')} />
+              <CompactToolCard className="excel" title="Excel to PDF" desc="Convert spreadsheets to PDF." icon={FilePdf} icon={FileText} onClick={() => setCurrentTool('excel-to-pdf')} />
+              <CompactToolCard className="excel" title="PDF to Excel" desc="Extract tables to XLSX." icon={FileSpreadsheet} onClick={() => setCurrentTool('pdf-to-excel')} />
+            </div>
+          </div>
         </div>
-      </div>
-
-      <div className="dashboard-section">
-        <div className="section-header">
-          <Lock size={24} color="#555" />
-          <h2>Security</h2>
-        </div>
-        <div className="tool-grid">
-          <ToolCard className="security" title="Unlock PDF" desc="Remove PDF password security." icon={Unlock} onClick={() => setCurrentTool('pdf-unlock')} />
-          <ToolCard className="security" title="Protect PDF" desc="Encrypt PDF with a password." icon={Lock} onClick={() => setCurrentTool('pdf-protect')} />
-          <ToolCard className="security" title="Sign PDF" desc="Sign yourself or request signatures." icon={FileCheck} onClick={() => setCurrentTool('pdf-sign')} />
-        </div>
-      </div>
-
-      <div className="dashboard-section">
-        <div className="section-header">
-          <FileSpreadsheet size={24} color="#2e7d32" />
-          <h2>Excel Tools</h2>
-        </div>
-        <div className="tool-grid">
-          <ToolCard className="excel" title="Merge Excel" desc="Combine multiple Excel/CSV files." icon={Combine} onClick={() => setCurrentTool('excel-merge')} />
-        </div>
-      </div>
+      )}
     </div>
   );
 
@@ -234,38 +207,38 @@ function App() {
     <div className="app-wrapper">
       <header className="premium-header">
         <div className="logo" onClick={reset} style={{cursor: 'pointer'}}>
-          <FileSpreadsheet size={32} /> FileMaster Suite
+          <FileSpreadsheet size={24} /> FileMaster Pro
         </div>
-        <nav style={{display: 'flex', gap: '1rem'}}>
-          <div className="nav-link" onClick={() => setCurrentTool('home')}>Home</div>
-          <div className="nav-link" onClick={() => setCurrentTool('excel-merge')}>Excel</div>
-          <div className="nav-link" onClick={() => setCurrentTool('pdf-edit')}>PDF Editor</div>
+        <nav className="main-nav">
+          <div className={`nav-link ${currentTool === 'home' ? 'active' : ''}`} onClick={reset}>Home</div>
+          <div className="nav-link" onClick={() => {reset(); setActiveSegment('pdf');}}>PDF Tools</div>
+          <div className="nav-link" onClick={() => {reset(); setActiveSegment('excel');}}>Excel Tools</div>
         </nav>
       </header>
 
       <main style={{flex: 1, background: 'var(--bg-light)', overflowY: 'auto'}}>
         {currentTool === 'home' ? (
           <div className="hero">
-            <h1>Every tool you need for PDF & Excel</h1>
-            <p>100% Free and Private</p>
+            <h1>Unified File Management</h1>
+            <p>Professional PDF and Excel tools in one place.</p>
             {renderDashboard()}
           </div>
         ) : result ? (
           <div className="workspace" style={{justifyContent: 'center'}}>
             <div className="main-content success-view" style={{maxWidth: '800px'}}>
-              <h2>Processed Successfully!</h2>
+              <h2>Operation Successful!</h2>
               <a href={`${API_URL}${result.downloadUrl}`} className="download-link">
-                Download Result <Download />
+                Download Processed File <Download />
               </a>
-              <button className="btn" onClick={reset} style={{marginTop: '2rem'}}>Start Over</button>
+              <button className="btn" onClick={reset} style={{marginTop: '2rem'}}>Start New Task</button>
             </div>
           </div>
         ) : (
           <div className="workspace">
-            <div className="main-content" style={{position: 'relative'}}>
+            <div className="main-content">
               {files.length === 0 ? (
                 <div className="hero">
-                  <h2>{currentTool.replace('-', ' ').toUpperCase()}</h2>
+                  <h2 style={{textTransform: 'uppercase'}}>{currentTool.replace(/-/g, ' ')}</h2>
                   <div className="select-btn" onClick={() => document.getElementById('fileInput').click()}>
                     Select File
                   </div>
@@ -274,37 +247,37 @@ function App() {
                     type="file" 
                     multiple 
                     hidden 
-                    accept={currentTool.includes('pdf') || currentTool.includes('to-pdf') ? '.pdf,.jpg,.png,.docx,.pptx,.xlsx' : '.xlsx,.csv'} 
+                    accept={activeSegment === 'pdf' ? '.pdf' : '.xlsx,.csv'} 
                     onChange={onFileChange} 
                   />
                 </div>
               ) : ['pdf-edit', 'pdf-rotate'].includes(currentTool) ? (
                 <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem'}}>
-                  <div style={{background: '#eee', padding: '10px', borderRadius: '5px', display: 'flex', gap: '10px', alignItems: 'center'}}>
+                  <div style={{background: 'white', padding: '10px', borderRadius: '8px', boxShadow: 'var(--shadow)', display: 'flex', gap: '10px', alignItems: 'center'}}>
                     {currentTool === 'pdf-rotate' ? (
                       <>
-                        <button onClick={() => setRotation((rotation + 90) % 360)}>Rotate Right (90°)</button>
-                        <span style={{fontWeight: 'bold'}}>Current Rotation: {rotation}°</span>
+                        <button className="btn" onClick={() => setRotation((rotation + 90) % 360)}>Rotate +90°</button>
+                        <span style={{fontWeight: 'bold'}}>{rotation}°</span>
                       </>
                     ) : (
                       <>
-                        <button onClick={() => { if(currentPage > 1) { setCurrentPage(currentPage-1); renderPage(pdfDoc, currentPage-1); }}}>Prev</button>
-                        <span>Page {currentPage} of {pdfDoc?.numPages}</span>
-                        <button onClick={() => { if(currentPage < pdfDoc?.numPages) { setCurrentPage(currentPage+1); renderPage(pdfDoc, currentPage+1); }}}>Next</button>
-                        <div style={{borderLeft: '1px solid #ccc', margin: '0 10px'}}></div>
-                        <span style={{fontSize: '0.8rem', color: '#666'}}><Type size={14} /> Click to add text</span>
+                        <button className="btn" onClick={() => { if(currentPage > 1) { setCurrentPage(currentPage-1); renderPage(pdfDoc, currentPage-1); }}}>Prev</button>
+                        <span style={{fontSize: '0.9rem'}}>Page {currentPage} of {pdfDoc?.numPages}</span>
+                        <button className="btn" onClick={() => { if(currentPage < pdfDoc?.numPages) { setCurrentPage(currentPage+1); renderPage(pdfDoc, currentPage+1); }}}>Next</button>
+                        <div style={{borderLeft: '1px solid #ccc', height: '20px', margin: '0 5px'}}></div>
+                        <span style={{fontSize: '0.8rem', color: '#666'}}>Click on page to add text</span>
                       </>
                     )}
                   </div>
-                  <div style={{position: 'relative', boxShadow: '0 0 20px rgba(0,0,0,0.2)', transform: `rotate(${rotation}deg)`, transition: 'transform 0.3s'}}>
-                    <canvas ref={canvasRef} onClick={handleCanvasClick} style={{cursor: currentTool === 'pdf-edit' ? 'crosshair' : 'default'}}></canvas>
+                  <div style={{position: 'relative', boxShadow: '0 0 30px rgba(0,0,0,0.1)', transform: `rotate(${rotation}deg)`, transition: 'transform 0.3s'}}>
+                    <canvas ref={canvasRef} onClick={handleCanvasClick} style={{cursor: currentTool === 'pdf-edit' ? 'crosshair' : 'default', maxWidth: '100%'}}></canvas>
                     {currentTool === 'pdf-edit' && modifications.filter(m => m.pageIndex === currentPage - 1).map((m, i) => (
                       <div key={i} style={{
                         position: 'absolute',
-                        left: m.x * 1.2,
-                        top: (canvasRef.current?.height || 0) - (m.y * 1.2),
+                        left: m.x,
+                        top: (canvasRef.current?.height || 0) - m.y,
                         color: 'black',
-                        fontSize: '18px',
+                        fontSize: '16px',
                         pointerEvents: 'none',
                         background: 'rgba(255,255,0,0.3)',
                         padding: '2px'
@@ -320,7 +293,7 @@ function App() {
                     <div key={idx} className="file-card">
                       <div className="remove-btn" onClick={() => removeFile(idx)}><X size={14} /></div>
                       <div className="icon-container">
-                        {file.name.toLowerCase().endsWith('.pdf') ? <Upload size={64} /> : <FileSpreadsheet size={64} />}
+                        {activeSegment === 'pdf' ? <Upload size={64} /> : <FileSpreadsheet size={64} />}
                       </div>
                       <div className="file-name">{file.name}</div>
                     </div>
@@ -332,7 +305,6 @@ function App() {
                       type="file" 
                       multiple 
                       hidden 
-                      accept={currentTool.includes('pdf') || currentTool.includes('to-pdf') ? '.pdf,.jpg,.png,.docx,.pptx,.xlsx' : '.xlsx,.csv'} 
                       onChange={onFileChange} 
                     />
                   </div>
@@ -342,13 +314,13 @@ function App() {
 
             {files.length > 0 && (
               <aside className="sidebar">
-                <h2>{currentTool.replace('-', ' ')}</h2>
+                <h2 style={{fontSize: '1.2rem', marginBottom: '1rem'}}>{currentTool.replace(/-/g, ' ')}</h2>
                 <div className="option-card active">
-                  <div className="option-title">Process File</div>
-                  <div className="option-desc">Apply your changes and download.</div>
+                  <div className="option-title">Standard Processing</div>
+                  <div className="option-desc">Optimal quality and speed.</div>
                 </div>
                 <button className="action-btn" onClick={handleProcess} disabled={isProcessing}>
-                  {isProcessing ? 'PROCESSING...' : 'Download Result'}
+                  {isProcessing ? 'PROCESSING...' : 'Process & Download'}
                 </button>
               </aside>
             )}
@@ -357,13 +329,9 @@ function App() {
       </main>
 
       {isProcessing && (
-        <div className="loading-overlay" style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-          background: 'rgba(255,255,255,0.9)', display: 'flex', 
-          flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 1000
-        }}>
-          <Loader2 size={64} className="animate-spin" color="var(--primary)" />
-          <h2>Processing your files...</h2>
+        <div className="loading-overlay">
+          <Loader2 size={48} className="animate-spin" color="var(--primary)" />
+          <h2 style={{marginTop: '1rem'}}>Processing your files...</h2>
         </div>
       )}
     </div>
