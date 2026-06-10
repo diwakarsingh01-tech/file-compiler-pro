@@ -207,7 +207,10 @@ function App() {
     <div className="app-wrapper">
       <header className="premium-header">
         <div className="logo" onClick={reset} style={{cursor: 'pointer'}}>
-          <FileSpreadsheet size={24} /> FileMaster Pro
+          <FileSpreadsheet size={24} /> DocuMax Pro
+        </div>
+        <div style={{fontSize: '0.8rem', color: '#999', fontWeight: '500', marginLeft: '1rem', flex: 1}}>
+          Created by <span style={{color: '#666', fontWeight: '700'}}>Diwakar Singh</span>
         </div>
         <nav className="main-nav">
           <div className={`nav-link ${currentTool === 'home' ? 'active' : ''}`} onClick={reset}>Home</div>
@@ -222,6 +225,12 @@ function App() {
             <h1>Unified File Management</h1>
             <p>Professional PDF and Excel tools in one place.</p>
             {renderDashboard()}
+            <footer style={{marginTop: '4rem', padding: '3rem 2rem', color: '#999', fontSize: '0.85rem', borderTop: '1px solid #eee', background: 'white'}}>
+              <div style={{maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                <div>&copy; 2026 <strong>DocuMax Pro Suite</strong>. All rights reserved.</div>
+                <div>Designed & Engineered by <span style={{color: '#555', fontWeight: '800'}}>Diwakar Singh</span></div>
+              </div>
+            </footer>
           </div>
         ) : result ? (
           <div className="workspace" style={{justifyContent: 'center'}}>
