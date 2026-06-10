@@ -162,29 +162,29 @@ function App() {
           <div className="category-box">
             <div className="category-title"><Layers size={16} /> Organize</div>
             <div className="compact-grid">
-              <CompactToolCard title="Merge PDF" desc="Combine multiple PDFs." icon={Combine} onClick={() => setCurrentTool('pdf-merge')} />
-              <CompactToolCard title="Split PDF" desc="Extract pages from PDF." icon={SplitSquareVertical} onClick={() => setCurrentTool('pdf-split')} />
-              <CompactToolCard title="Remove pages" desc="Delete specific pages." icon={FileMinus} onClick={() => setCurrentTool('pdf-remove')} />
-              <CompactToolCard title="Extract pages" desc="Save specific pages." icon={FileUp} onClick={() => setCurrentTool('pdf-extract')} />
+              <CompactToolCard title="Merge PDF" desc="Combine multiple PDFs." icon={Combine} onClick={() => { setActiveSegment('pdf'); setCurrentTool('pdf-merge'); }} />
+              <CompactToolCard title="Split PDF" desc="Extract pages from PDF." icon={SplitSquareVertical} onClick={() => { setActiveSegment('pdf'); setCurrentTool('pdf-split'); }} />
+              <CompactToolCard title="Remove pages" desc="Delete specific pages." icon={FileMinus} onClick={() => { setActiveSegment('pdf'); setCurrentTool('pdf-remove'); }} />
+              <CompactToolCard title="Extract pages" desc="Save specific pages." icon={FileUp} onClick={() => { setActiveSegment('pdf'); setCurrentTool('pdf-extract'); }} />
             </div>
           </div>
 
           <div className="category-box">
             <div className="category-title"><Zap size={16} /> Optimize & Edit</div>
             <div className="compact-grid">
-              <CompactToolCard title="Compress PDF" desc="Reduce file size." icon={Zap} onClick={() => setCurrentTool('pdf-compress')} />
-              <CompactToolCard title="Edit PDF" desc="Add text and images." icon={PenTool} onClick={() => setCurrentTool('pdf-edit')} />
-              <CompactToolCard title="Rotate PDF" desc="Rotate PDF pages." icon={RotateCcw} onClick={() => setCurrentTool('pdf-rotate')} />
-              <CompactToolCard title="Watermark" desc="Add text/image stamp." icon={Stamp} onClick={() => setCurrentTool('pdf-watermark')} />
+              <CompactToolCard title="Compress PDF" desc="Reduce file size." icon={Zap} onClick={() => { setActiveSegment('pdf'); setCurrentTool('pdf-compress'); }} />
+              <CompactToolCard title="Edit PDF" desc="Add text and images." icon={PenTool} onClick={() => { setActiveSegment('pdf'); setCurrentTool('pdf-edit'); }} />
+              <CompactToolCard title="Rotate PDF" desc="Rotate PDF pages." icon={RotateCcw} onClick={() => { setActiveSegment('pdf'); setCurrentTool('pdf-rotate'); }} />
+              <CompactToolCard title="Watermark" desc="Add text/image stamp." icon={Stamp} onClick={() => { setActiveSegment('pdf'); setCurrentTool('pdf-watermark'); }} />
             </div>
           </div>
 
           <div className="category-box">
             <div className="category-title"><Lock size={16} /> Security</div>
             <div className="compact-grid">
-              <CompactToolCard title="Protect PDF" desc="Add password security." icon={Lock} onClick={() => setCurrentTool('pdf-protect')} />
-              <CompactToolCard title="Unlock PDF" desc="Remove password." icon={Unlock} onClick={() => setCurrentTool('pdf-unlock')} />
-              <CompactToolCard title="Sign PDF" desc="Sign your documents." icon={FileCheck} onClick={() => setCurrentTool('pdf-sign')} />
+              <CompactToolCard title="Protect PDF" desc="Add password security." icon={Lock} onClick={() => { setActiveSegment('pdf'); setCurrentTool('pdf-protect'); }} />
+              <CompactToolCard title="Unlock PDF" desc="Remove password." icon={Unlock} onClick={() => { setActiveSegment('pdf'); setCurrentTool('pdf-unlock'); }} />
+              <CompactToolCard title="Sign PDF" desc="Sign your documents." icon={FileCheck} onClick={() => { setActiveSegment('pdf'); setCurrentTool('pdf-sign'); }} />
             </div>
           </div>
         </div>
@@ -193,9 +193,9 @@ function App() {
           <div className="category-box">
             <div className="category-title"><FileSpreadsheet size={16} /> Data Tools</div>
             <div className="compact-grid">
-              <CompactToolCard className="excel" title="Merge Excel" desc="Combine multiple XLSX/CSV." icon={Combine} onClick={() => setCurrentTool('excel-merge')} />
-              <CompactToolCard className="excel" title="Excel to PDF" desc="Convert spreadsheets to PDF." icon={FilePdf} icon={FileText} onClick={() => setCurrentTool('excel-to-pdf')} />
-              <CompactToolCard className="excel" title="PDF to Excel" desc="Extract tables to XLSX." icon={FileSpreadsheet} onClick={() => setCurrentTool('pdf-to-excel')} />
+              <CompactToolCard className="excel" title="Merge Excel" desc="Combine multiple XLSX/CSV." icon={Combine} onClick={() => { setActiveSegment('excel'); setCurrentTool('excel-merge'); }} />
+              <CompactToolCard className="excel" title="Excel to PDF" desc="Convert spreadsheets to PDF." icon={FileText} onClick={() => { setActiveSegment('excel'); setCurrentTool('excel-to-pdf'); }} />
+              <CompactToolCard className="excel" title="PDF to Excel" desc="Extract tables to XLSX." icon={FileSpreadsheet} onClick={() => { setActiveSegment('excel'); setCurrentTool('pdf-to-excel'); }} />
             </div>
           </div>
         </div>
@@ -211,8 +211,8 @@ function App() {
         </div>
         <nav className="main-nav">
           <div className={`nav-link ${currentTool === 'home' ? 'active' : ''}`} onClick={reset}>Home</div>
-          <div className="nav-link" onClick={() => {reset(); setActiveSegment('pdf');}}>PDF Tools</div>
-          <div className="nav-link" onClick={() => {reset(); setActiveSegment('excel');}}>Excel Tools</div>
+          <div className={`nav-link ${activeSegment === 'pdf' && currentTool === 'home' ? 'active' : ''}`} onClick={() => {reset(); setActiveSegment('pdf');}}>PDF Tools</div>
+          <div className={`nav-link ${activeSegment === 'excel' && currentTool === 'home' ? 'active' : ''}`} onClick={() => {reset(); setActiveSegment('excel');}}>Excel Tools</div>
         </nav>
       </header>
 
