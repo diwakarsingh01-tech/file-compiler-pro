@@ -32,13 +32,16 @@ const getHeaders = (sheet) => {
 app.post('/api/upload', upload.array('files'), (req, res) => {
     try {
         if (!req.files || req.files.length === 0) {
+            console.log('Upload attempt with no files.');
             return res.status(400).json({ error: 'No files uploaded.' });
         }
 
+        console.log(`Processing ${req.files.length} files...`);
         let combinedData = [];
         let masterHeaders = null;
 
         for (const file of req.files) {
+            console.log(`Reading file: ${file.originalname}`);
             const workbook = xlsx.readFile(file.path);
             const sheetName = workbook.SheetNames[0];
             const sheet = workbook.Sheets[sheetName];
@@ -47,8 +50,10 @@ app.post('/api/upload', upload.array('files'), (req, res) => {
             
             if (!masterHeaders) {
                 masterHeaders = headers;
+                console.log('Master headers set:', masterHeaders);
             } else {
                 if (JSON.stringify(headers) !== JSON.stringify(masterHeaders)) {
+                    console.error(`Header mismatch in ${file.originalname}`);
                     req.files.forEach(f => { if(fs.existsSync(f.path)) fs.unlinkSync(f.path) });
                     return res.status(400).json({ 
                         error: `Header mismatch in file: ${file.originalname}` 
@@ -58,6 +63,7 @@ app.post('/api/upload', upload.array('files'), (req, res) => {
 
             const data = xlsx.utils.sheet_to_json(sheet);
             combinedData = combinedData.concat(data);
+            console.log(`Added ${data.length} rows from ${file.originalname}`);
             
             if(fs.existsSync(file.path)) fs.unlinkSync(file.path);
         }
@@ -75,6 +81,7 @@ app.post('/api/upload', upload.array('files'), (req, res) => {
         }
 
         xlsx.writeFile(newWorkbook, filePath);
+        console.log(`Merged file created: ${fileName}`);
 
         res.json({ 
             message: 'Files merged successfully', 
@@ -83,7 +90,7 @@ app.post('/api/upload', upload.array('files'), (req, res) => {
         });
 
     } catch (error) {
-        console.error(error);
+        console.error('Processing error:', error);
         res.status(500).json({ error: 'An error occurred during processing.' });
     }
 });
